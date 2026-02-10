@@ -1,17 +1,17 @@
 package routes
 
 import (
+	"clothes-shop-api/internal/config"
 	"clothes-shop-api/internal/handlers"
 	"clothes-shop-api/internal/repositories"
 
 	"github.com/gin-gonic/gin"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func SetupRoutes(r *gin.Engine, db *pgxpool.Pool, jwtSecret string) {
+func SetupRoutes(r *gin.Engine, jwtSecret string) {
 	// Initialize repositories
-	productRepo := repositories.NewProductRepository(db)
-	userRepo := repositories.NewUserRepository(db)
+	productRepo := repositories.NewProductRepository(config.DB)
+	userRepo := repositories.NewUserRepository(config.DB)
 
 	// Initialize handlers
 	productHandler := handlers.NewProductHandler(productRepo)

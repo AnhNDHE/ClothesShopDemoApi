@@ -5,9 +5,9 @@ import (
 
 	_ "clothes-shop-api/docs"
 	"clothes-shop-api/internal/config"
-	"clothes-shop-api/internal/db"
 	"clothes-shop-api/internal/routes"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	swaggerFiles "github.com/swaggo/files"
@@ -31,17 +31,22 @@ import (
 func main() {
 	_ = godotenv.Load()
 
+	config.InitDB()
+	config.RunMigration()
+
 	cfg := config.LoadConfig()
-	db.Connect(cfg.DBUrl)
 
 	r := gin.Default()
+
+	// CORS middleware
+	r.Use(cors.Default())
 
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "OK"})
 	})
 
 	// Setup routes
-	routes.SetupRoutes(r, db.DB, cfg.JWTSecret)
+	routes.SetupRoutes(r, cfg.JWTSecret)
 
 	// Swagger endpoint
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
