@@ -4,6 +4,7 @@ import (
 	"log"
 	"os"
 
+	"clothes-shop-api/docs"
 	_ "clothes-shop-api/docs"
 	"clothes-shop-api/internal/config"
 	"clothes-shop-api/internal/routes"
@@ -18,76 +19,72 @@ import (
 // @title Clothes Shop API
 // @version 1.0
 // @description A RESTful API for a clothes shop built with Golang and Gin.
-// @termsOfService http://swagger.io/terms/
-
-// @contact.name API Support
-// @contact.url http://www.swagger.io/support
-// @contact.email support@swagger.io
-
-// @license.name Apache 2.0
-// @license.url http://www.apache.org/licenses/LICENSE-2.0.html
-
-// ❗ KHÔNG set @host → để swagger tự nhận domain (local / render)
 // @BasePath /
 func main() {
-	// Load .env (local only, render sẽ ignore nếu không có)
+
+	// Load .env (local only)
 	_ = godotenv.Load()
 
-	// Init DB + migration
+	// Init database
 	config.InitDB()
 	config.RunMigration()
 
 	cfg := config.LoadConfig()
 
-	// Gin
+	// Create Gin server
 	r := gin.Default()
 
-	// CORS (tạm open, sau này fix theo domain FE)
+	// CORS (open for demo)
 	r.Use(cors.Default())
 
-	// Root → redirect swagger
+	// Root → redirect to swagger
 	r.GET("/", func(c *gin.Context) {
 		c.Redirect(302, "/swagger/index.html")
 	})
 
-	// Healthcheck (Render dùng rất nhiều)
+	// Health check (Render dùng)
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{
 			"status": "OK",
 		})
 	})
 
-	// API routes
+	// Setup API routes
 	routes.SetupRoutes(r, cfg.JWTSecret)
 
-	// PORT (Render cấp động)
+	// =============================
+	// 🔥 DYNAMIC PORT (Render)
+	// =============================
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "8080" // local
+		port = "8080"
 	}
 
-	// SWAGGER_HOST (flexible cho local / production)
-	var swaggerScheme string
+	// =============================
+	// 🔥 FIX SWAGGER HOST + SCHEME
+	// =============================
 	swaggerHost := os.Getenv("SWAGGER_HOST")
 	if swaggerHost == "" {
-		swaggerHost = "localhost:" + port // local default
-		swaggerScheme = "http"
-	} else {
-		swaggerScheme = "https" // production default to https
+		swaggerHost = "localhost:" + port
 	}
 
-	// SWAGGER_SCHEME (override if set)
-	if envScheme := os.Getenv("SWAGGER_SCHEME"); envScheme != "" {
-		swaggerScheme = envScheme
+	swaggerScheme := "http"
+	if swaggerHost != "localhost:"+port {
+		swaggerScheme = "https"
 	}
 
-	// Swagger with dynamic host and scheme
-	swaggerURL := swaggerScheme + "://" + swaggerHost + "/swagger/doc.json"
-	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler, ginSwagger.URL(swaggerURL)))
+	// 👇 QUAN TRỌNG
+	docs.SwaggerInfo.Host = swaggerHost
+	docs.SwaggerInfo.Schemes = []string{swaggerScheme}
 
+	// Swagger endpoint
+	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+
+	log.Println("====================================")
 	log.Println("🚀 Server running on port:", port)
+	log.Println("🌐 Swagger Host:", swaggerHost)
 	log.Println("📖 Swagger UI: /swagger/index.html")
-	log.Println("🌐 Swagger Host set to:", swaggerHost)
+	log.Println("====================================")
 
 	// Start server
 	if err := r.Run(":" + port); err != nil {
