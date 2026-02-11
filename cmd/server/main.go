@@ -60,17 +60,25 @@ func main() {
 	// API routes
 	routes.SetupRoutes(r, cfg.JWTSecret)
 
-	// Swagger
-	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
-
 	// PORT (Render cấp động)
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080" // local
 	}
 
+	// SWAGGER_HOST (flexible cho local / production)
+	swaggerHost := os.Getenv("SWAGGER_HOST")
+	if swaggerHost == "" {
+		swaggerHost = "localhost:" + port // local default
+	}
+
+	// Swagger with dynamic host
+	swaggerURL := "http://" + swaggerHost + "/swagger/doc.json"
+	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler, ginSwagger.URL(swaggerURL)))
+
 	log.Println("🚀 Server running on port:", port)
 	log.Println("📖 Swagger UI: /swagger/index.html")
+	log.Println("🌐 Swagger Host set to:", swaggerHost)
 
 	// Start server
 	if err := r.Run(":" + port); err != nil {
