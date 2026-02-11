@@ -316,7 +316,7 @@ paths:
       consumes:
       - application/json
       description: Retrieve a list of products with optional pagination, price filter,
-        category filter, and search
+        category filter, brand filter, and search
       parameters:
       - default: 1
         description: Page number (default 1)
@@ -339,6 +339,10 @@ paths:
       - description: Category name filter
         in: query
         name: category
+        type: string
+      - description: Brand name filter
+        in: query
+        name: brand
         type: string
       - description: Product name search
         in: query

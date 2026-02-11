@@ -80,17 +80,6 @@ CREATE TABLE orders (
     created_at TIMESTAMP DEFAULT now()
 );
 
--- SEED DATA
-INSERT INTO categories (name) VALUES
-('T-Shirt'),
-('Jacket'),
-('Pants');
-
-INSERT INTO brands (name) VALUES
-('Nike'),
-('Adidas'),
-('Puma');
-
 -- Admin user
 INSERT INTO users (email, password, role)
 VALUES ('admin@shop.com', '123456', 'admin');

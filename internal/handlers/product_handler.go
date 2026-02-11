@@ -42,7 +42,7 @@ func NewProductHandler(repo *repositories.ProductRepository) *ProductHandler {
 
 // GetAllProducts godoc
 // @Summary Get all products with pagination and filters
-// @Description Retrieve a list of products with optional pagination, price filter, category filter, and search
+// @Description Retrieve a list of products with optional pagination, price filter, category filter, brand filter, and search
 // @Tags products
 // @Accept  json
 // @Produce  json
@@ -51,6 +51,7 @@ func NewProductHandler(repo *repositories.ProductRepository) *ProductHandler {
 // @Param min_price query number false "Minimum price filter"
 // @Param max_price query number false "Maximum price filter"
 // @Param category query string false "Category name filter"
+// @Param brand query string false "Brand name filter"
 // @Param search query string false "Product name search"
 // @Success 200 {array} models.Product
 // @Router /products [get]
@@ -83,16 +84,20 @@ func (h *ProductHandler) GetAllProducts(c *gin.Context) {
 		}
 	}
 
-	var categoryName, searchName *string
+	var categoryName, brandName, searchName *string
 	if cat := c.Query("category"); cat != "" {
 		categoryName = &cat
+	}
+
+	if brand := c.Query("brand"); brand != "" {
+		brandName = &brand
 	}
 
 	if search := c.Query("search"); search != "" {
 		searchName = &search
 	}
 
-	products, err := h.repo.GetAllProducts(c.Request.Context(), page, limit, minPrice, maxPrice, categoryName, searchName)
+	products, err := h.repo.GetAllProducts(c.Request.Context(), page, limit, minPrice, maxPrice, categoryName, brandName, searchName)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

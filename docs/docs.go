@@ -151,7 +151,7 @@ const docTemplate = `{
         },
         "/products": {
             "get": {
-                "description": "Retrieve a list of products with optional pagination, price filter, category filter, and search",
+                "description": "Retrieve a list of products with optional pagination, price filter, category filter, brand filter, and search",
                 "consumes": [
                     "application/json"
                 ],
@@ -193,6 +193,12 @@ const docTemplate = `{
                         "type": "string",
                         "description": "Category name filter",
                         "name": "category",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Brand name filter",
+                        "name": "brand",
                         "in": "query"
                     },
                     {

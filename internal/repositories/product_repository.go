@@ -17,13 +17,14 @@ func NewProductRepository(db *pgxpool.Pool) *ProductRepository {
 	return &ProductRepository{DB: db}
 }
 
-func (r *ProductRepository) GetAllProducts(ctx context.Context, page, limit int, minPrice, maxPrice *float64, categoryName, searchName *string) ([]models.Product, error) {
+func (r *ProductRepository) GetAllProducts(ctx context.Context, page, limit int, minPrice, maxPrice *float64, categoryName, brandName, searchName *string) ([]models.Product, error) {
 	offset := (page - 1) * limit
 
 	query := `
 		SELECT p.id, p.name, p.description, p.min_price, p.max_price, p.total_stock, p.category_id, p.brand_id, p.created_at, p.updated_at, p.is_active, p.is_deleted
 		FROM products p
 		JOIN categories c ON p.category_id = c.id
+		LEFT JOIN brands b ON p.brand_id = b.id
 		WHERE p.is_active = true AND p.is_deleted = false
 	`
 
@@ -46,6 +47,12 @@ func (r *ProductRepository) GetAllProducts(ctx context.Context, page, limit int,
 		argCount++
 		query += ` AND c.name ILIKE $` + strconv.Itoa(argCount)
 		args = append(args, "%"+*categoryName+"%")
+	}
+
+	if brandName != nil {
+		argCount++
+		query += ` AND b.name ILIKE $` + strconv.Itoa(argCount)
+		args = append(args, "%"+*brandName+"%")
 	}
 
 	if searchName != nil {
