@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"os"
 
 	_ "clothes-shop-api/docs"
 	"clothes-shop-api/internal/config"
@@ -26,36 +27,53 @@ import (
 // @license.name Apache 2.0
 // @license.url http://www.apache.org/licenses/LICENSE-2.0.html
 
-// @host localhost:8080
+// ❗ KHÔNG set @host → để swagger tự nhận domain (local / render)
 // @BasePath /
 func main() {
+	// Load .env (local only, render sẽ ignore nếu không có)
 	_ = godotenv.Load()
 
+	// Init DB + migration
 	config.InitDB()
 	config.RunMigration()
 
 	cfg := config.LoadConfig()
 
+	// Gin
 	r := gin.Default()
 
-	// CORS middleware
+	// CORS (tạm open, sau này fix theo domain FE)
 	r.Use(cors.Default())
 
+	// Root → redirect swagger
 	r.GET("/", func(c *gin.Context) {
 		c.Redirect(302, "/swagger/index.html")
 	})
 
+	// Healthcheck (Render dùng rất nhiều)
 	r.GET("/health", func(c *gin.Context) {
-		c.JSON(200, gin.H{"status": "OK"})
+		c.JSON(200, gin.H{
+			"status": "OK",
+		})
 	})
 
-	// Setup routes
+	// API routes
 	routes.SetupRoutes(r, cfg.JWTSecret)
 
-	// Swagger endpoint
+	// Swagger
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
-	log.Println("🚀 Server running at :8080")
-	log.Println("📖 Swagger UI available at: http://localhost:8080/swagger/index.html")
-	r.Run(":8080")
+	// PORT (Render cấp động)
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080" // local
+	}
+
+	log.Println("🚀 Server running on port:", port)
+	log.Println("📖 Swagger UI: /swagger/index.html")
+
+	// Start server
+	if err := r.Run(":" + port); err != nil {
+		log.Fatal("❌ Failed to start server:", err)
+	}
 }
