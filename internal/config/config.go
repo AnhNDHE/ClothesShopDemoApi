@@ -150,15 +150,6 @@ CREATE TABLE orders (
 );
 
 -- SEED DATA
-INSERT INTO categories (name) VALUES
-('T-Shirt'),
-('Jacket'),
-('Pants');
-
-INSERT INTO brands (name) VALUES
-('Nike'),
-('Adidas'),
-('Puma');
 
 -- Admin user
 INSERT INTO users (email, password, role)
