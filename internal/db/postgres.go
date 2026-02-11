@@ -9,6 +9,7 @@ import (
 
 var DB *pgxpool.Pool
 
+// Connect initializes the PostgreSQL connection
 func Connect(dbUrl string) {
 	var err error
 	DB, err = pgxpool.New(context.Background(), dbUrl)
