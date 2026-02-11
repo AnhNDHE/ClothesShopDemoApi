@@ -27,7 +27,7 @@ func main() {
 
 	// Init database
 	config.InitDB()
-	config.RunMigration()
+	//config.RunMigration()
 
 	cfg := config.LoadConfig()
 

@@ -19,19 +19,24 @@ type Config struct {
 func InitDB() {
 	dsn := os.Getenv("DATABASE_URL")
 
-	// If DATABASE_URL is not set, build from individual env vars (for local development)
+	// If DATABASE_URL is not set, build from individual env vars (for local development or Render)
 	if dsn == "" {
 		dbHost := os.Getenv("DB_HOST")
 		dbPort := os.Getenv("DB_PORT")
 		dbName := os.Getenv("DB_NAME")
 		dbUser := os.Getenv("DB_USER")
 		dbPassword := os.Getenv("DB_PASSWORD")
+		dbSSLMode := os.Getenv("DB_SSLMODE")
 
 		if dbHost == "" || dbPort == "" || dbName == "" || dbUser == "" || dbPassword == "" {
 			log.Fatal("DATABASE_URL or individual DB_* environment variables are required")
 		}
 
-		dsn = "postgres://" + dbUser + ":" + dbPassword + "@" + dbHost + ":" + dbPort + "/" + dbName + "?sslmode=disable"
+		if dbSSLMode == "" {
+			dbSSLMode = "disable"
+		}
+
+		dsn = "postgres://" + dbUser + ":" + dbPassword + "@" + dbHost + ":" + dbPort + "/" + dbName + "?sslmode=" + dbSSLMode
 	}
 
 	config, err := pgxpool.ParseConfig(dsn)
@@ -39,8 +44,8 @@ func InitDB() {
 		log.Fatal("Cannot parse DB config:", err)
 	}
 
-	// Only set TLS config for external databases (like Render)
-	if os.Getenv("DATABASE_URL") != "" {
+	// Set TLS config for external databases (like Render) when sslmode=require
+	if os.Getenv("DB_SSLMODE") == "require" || os.Getenv("DATABASE_URL") != "" {
 		config.ConnConfig.TLSConfig = &tls.Config{
 			InsecureSkipVerify: true, // Required for Render
 		}

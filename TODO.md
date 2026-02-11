@@ -1,4 +1,4 @@
-nh là t value của di# TODO List for Clothes Shop API Project
+nhlà nh là t value của di# TODO List for Clothes Shop API Project
 
 - [x] Initialize Go module with `go mod init clothes-shop-api`
 - [x] Install required Go libraries (gin, pgx/v5, pgxpool, godotenv, uuid)
