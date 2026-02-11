@@ -15,6 +15,7 @@ type Config struct {
 	JWTSecret string
 }
 
+// InitDB initializes the PostgreSQL connection
 func InitDB() {
 	dsn := os.Getenv("DATABASE_URL")
 
