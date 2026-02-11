@@ -2,6 +2,7 @@ package config
 
 import (
 	"context"
+	"crypto/tls"
 	"log"
 	"os"
 
@@ -20,8 +21,16 @@ func InitDB() {
 		log.Fatal("DATABASE_URL is empty")
 	}
 
-	var err error
-	DB, err = pgxpool.New(context.Background(), dsn)
+	config, err := pgxpool.ParseConfig(dsn)
+	if err != nil {
+		log.Fatal("Cannot parse DB config:", err)
+	}
+
+	config.ConnConfig.TLSConfig = &tls.Config{
+		InsecureSkipVerify: true, // Required for Render
+	}
+
+	DB, err = pgxpool.NewWithConfig(context.Background(), config)
 	if err != nil {
 		log.Fatal("Cannot connect DB:", err)
 	}
