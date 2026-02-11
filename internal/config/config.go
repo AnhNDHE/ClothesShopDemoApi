@@ -17,8 +17,20 @@ type Config struct {
 
 func InitDB() {
 	dsn := os.Getenv("DATABASE_URL")
+
+	// If DATABASE_URL is not set, build from individual env vars (for local development)
 	if dsn == "" {
-		log.Fatal("DATABASE_URL is empty")
+		dbHost := os.Getenv("DB_HOST")
+		dbPort := os.Getenv("DB_PORT")
+		dbName := os.Getenv("DB_NAME")
+		dbUser := os.Getenv("DB_USER")
+		dbPassword := os.Getenv("DB_PASSWORD")
+
+		if dbHost == "" || dbPort == "" || dbName == "" || dbUser == "" || dbPassword == "" {
+			log.Fatal("DATABASE_URL or individual DB_* environment variables are required")
+		}
+
+		dsn = "postgres://" + dbUser + ":" + dbPassword + "@" + dbHost + ":" + dbPort + "/" + dbName + "?sslmode=disable"
 	}
 
 	config, err := pgxpool.ParseConfig(dsn)
@@ -26,8 +38,11 @@ func InitDB() {
 		log.Fatal("Cannot parse DB config:", err)
 	}
 
-	config.ConnConfig.TLSConfig = &tls.Config{
-		InsecureSkipVerify: true, // Required for Render
+	// Only set TLS config for external databases (like Render)
+	if os.Getenv("DATABASE_URL") != "" {
+		config.ConnConfig.TLSConfig = &tls.Config{
+			InsecureSkipVerify: true, // Required for Render
+		}
 	}
 
 	DB, err = pgxpool.NewWithConfig(context.Background(), config)
@@ -40,195 +55,216 @@ func InitDB() {
 
 func RunMigration() {
 	sql := `
+	-- Drop tables if they exist (for development)
+	DROP TABLE IF EXISTS order_items CASCADE;
+	DROP TABLE IF EXISTS orders CASCADE;
+	DROP TABLE IF EXISTS cart_items CASCADE;
+	DROP TABLE IF EXISTS carts CASCADE;
+	DROP TABLE IF EXISTS product_variants CASCADE;
+	DROP TABLE IF EXISTS products CASCADE;
+	DROP TABLE IF EXISTS brands CASCADE;
+	DROP TABLE IF EXISTS categories CASCADE;
+	DROP TABLE IF EXISTS users CASCADE;
+
 	CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
-	-- USERS
-	CREATE TABLE IF NOT EXISTS users (
-		id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-		email TEXT UNIQUE NOT NULL,
-		password TEXT NOT NULL,
-		role TEXT DEFAULT 'customer',
-		created_at TIMESTAMP DEFAULT now(),
-		updated_at TIMESTAMP DEFAULT now()
-	);
+-- USERS
+CREATE TABLE users (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    email TEXT UNIQUE NOT NULL,
+    password TEXT NOT NULL,
+    role TEXT DEFAULT 'customer',
+    created_by UUID,
+    created_at TIMESTAMP DEFAULT now(),
+    updated_by UUID,
+    updated_at TIMESTAMP DEFAULT now(),
+    is_active BOOLEAN DEFAULT true,
+    is_deleted BOOLEAN DEFAULT false
+);
 
-	-- CATEGORIES
-	CREATE TABLE IF NOT EXISTS categories (
-		id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-		name TEXT NOT NULL,
-		created_at TIMESTAMP DEFAULT now(),
-		updated_at TIMESTAMP DEFAULT now()
-	);
+-- CATEGORIES
+CREATE TABLE categories (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name TEXT NOT NULL,
+    description TEXT,
+    created_by UUID,
+    created_at TIMESTAMP DEFAULT now(),
+    updated_by UUID,
+    updated_at TIMESTAMP DEFAULT now(),
+    is_active BOOLEAN DEFAULT true,
+    is_deleted BOOLEAN DEFAULT false
+);
 
-	-- BRANDS
-	CREATE TABLE IF NOT EXISTS brands (
-		id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-		name TEXT NOT NULL,
-		created_at TIMESTAMP DEFAULT now(),
-		updated_at TIMESTAMP DEFAULT now()
-	);
+-- BRANDS
+CREATE TABLE brands (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name TEXT NOT NULL,
+    description TEXT,
+    created_by UUID,
+    created_at TIMESTAMP DEFAULT now(),
+    updated_by UUID,
+    updated_at TIMESTAMP DEFAULT now(),
+    is_active BOOLEAN DEFAULT true,
+    is_deleted BOOLEAN DEFAULT false
+);
 
-	-- PRODUCTS
-	CREATE TABLE IF NOT EXISTS products (
-		id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-		name TEXT NOT NULL,
-		description TEXT,
-		price NUMERIC NOT NULL,
-		stock INT NOT NULL DEFAULT 0,
-		category_id UUID REFERENCES categories(id),
-		brand_id UUID REFERENCES brands(id),
-		is_active BOOLEAN DEFAULT true,
-		created_at TIMESTAMP DEFAULT now(),
-		updated_at TIMESTAMP DEFAULT now()
-	);
+-- PRODUCTS
+CREATE TABLE products (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name TEXT NOT NULL,
+    description TEXT,
+    min_price NUMERIC DEFAULT 0,
+    max_price NUMERIC DEFAULT 0,
+    stock INT DEFAULT 0,
+    category_id UUID REFERENCES categories(id),
+    brand_id UUID REFERENCES brands(id),
+    created_at TIMESTAMP DEFAULT now(),
+    updated_at TIMESTAMP DEFAULT now(),
+    is_active BOOLEAN DEFAULT true
+);
 
-	-- PRODUCT VARIANTS
-	CREATE TABLE IF NOT EXISTS product_variants (
-		id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-		product_id UUID REFERENCES products(id) ON DELETE CASCADE,
-		size TEXT,
-		color TEXT,
-		sku TEXT UNIQUE,
-		price_adjustment NUMERIC DEFAULT 0,
-		stock INT NOT NULL DEFAULT 0,
-		is_active BOOLEAN DEFAULT true,
-		created_at TIMESTAMP DEFAULT now(),
-		updated_at TIMESTAMP DEFAULT now()
-	);
+-- PRODUCT VARIANTS
+CREATE TABLE product_variants (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    product_id UUID REFERENCES products(id),
+    size TEXT NOT NULL,
+    color TEXT NOT NULL,
+    stock INT NOT NULL DEFAULT 0,
+    price NUMERIC NOT NULL DEFAULT 0,
+    image TEXT,
+    created_by UUID,
+    created_at TIMESTAMP DEFAULT now(),
+    updated_by UUID,
+    updated_at TIMESTAMP DEFAULT now(),
+    is_active BOOLEAN DEFAULT true,
+    is_deleted BOOLEAN DEFAULT false
+);
 
-	-- CART
-	CREATE TABLE IF NOT EXISTS carts (
-		id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-		user_id UUID REFERENCES users(id),
-		created_at TIMESTAMP DEFAULT now(),
-		updated_at TIMESTAMP DEFAULT now()
-	);
+-- CART
+CREATE TABLE carts (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES users(id)
+);
 
-	CREATE TABLE IF NOT EXISTS cart_items (
-		cart_id UUID REFERENCES carts(id) ON DELETE CASCADE,
-		product_variant_id UUID REFERENCES product_variants(id) ON DELETE CASCADE,
-		quantity INT NOT NULL,
-		created_at TIMESTAMP DEFAULT now(),
-		updated_at TIMESTAMP DEFAULT now(),
-		PRIMARY KEY (cart_id, product_variant_id)
-	);
+CREATE TABLE cart_items (
+    cart_id UUID REFERENCES carts(id),
+    product_id UUID REFERENCES products(id),
+    quantity INT NOT NULL,
+    PRIMARY KEY (cart_id, product_id)
+);
 
-	-- ORDERS
-	CREATE TABLE IF NOT EXISTS orders (
-		id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-		user_id UUID REFERENCES users(id),
-		total NUMERIC,
-		status TEXT DEFAULT 'pending',
-		created_at TIMESTAMP DEFAULT now(),
-		updated_at TIMESTAMP DEFAULT now()
-	);
+-- ORDERS
+CREATE TABLE orders (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES users(id),
+    total NUMERIC,
+    status TEXT,
+    created_at TIMESTAMP DEFAULT now()
+);
 
-	-- ORDER ITEMS
-	CREATE TABLE IF NOT EXISTS order_items (
-		id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-		order_id UUID REFERENCES orders(id) ON DELETE CASCADE,
-		product_variant_id UUID REFERENCES product_variants(id),
-		quantity INT NOT NULL,
-		price NUMERIC NOT NULL,
-		created_at TIMESTAMP DEFAULT now(),
-		updated_at TIMESTAMP DEFAULT now()
-	);
+-- SEED DATA
 
-	-- SEED DATA
-	INSERT INTO categories (name) VALUES
-	('T-Shirt'),
-	('Jacket'),
-	('Pants'),
-	('Shoes'),
-	('Accessories')
-	ON CONFLICT DO NOTHING;
+-- Categories (5 records)
+INSERT INTO categories (name, description) VALUES
+('T-Shirt', 'Comfortable cotton t-shirts'),
+('Jacket', 'Stylish jackets for all seasons'),
+('Pants', 'Various types of pants and trousers'),
+('Shoes', 'Footwear for men and women'),
+('Accessories', 'Fashion accessories and jewelry');
 
-	INSERT INTO brands (name) VALUES
-	('Nike'),
-	('Adidas'),
-	('Puma'),
-	('Levi''s'),
-	('Zara')
-	ON CONFLICT DO NOTHING;
+-- Brands (5 records)
+INSERT INTO brands (name, description) VALUES
+('Nike', 'Leading sportswear brand'),
+('Adidas', 'Global sports and lifestyle brand'),
+('Zara', 'Fast fashion retailer'),
+('H&M', 'Affordable fashion brand'),
+('Levi''s', 'Iconic denim brand');
 
-	INSERT INTO products (name, description, price, stock, category_id, brand_id)
-	SELECT 'Basic T-Shirt', 'Comfortable cotton t-shirt', 199000, 100, c.id, b.id
-	FROM categories c, brands b
-	WHERE c.name='T-Shirt' AND b.name='Nike'
-	ON CONFLICT DO NOTHING;
+-- Products (5 records, each with 2 variants)
+-- Product 1: Nike T-Shirt
+INSERT INTO products (name, description, min_price, max_price, stock, category_id, brand_id)
+SELECT 'Nike Sport T-Shirt', 'Comfortable athletic t-shirt', 250000, 300000, 150,
+       c.id, b.id
+FROM categories c, brands b
+WHERE c.name = 'T-Shirt' AND b.name = 'Nike';
 
-	INSERT INTO products (name, description, price, stock, category_id, brand_id)
-	SELECT 'Running Jacket', 'Lightweight running jacket', 599000, 50, c.id, b.id
-	FROM categories c, brands b
-	WHERE c.name='Jacket' AND b.name='Adidas'
-	ON CONFLICT DO NOTHING;
+-- Variants for Nike T-Shirt
+INSERT INTO product_variants (product_id, size, color, stock, price, image)
+SELECT p.id, 'M', 'Black', 50, 250000, 'nike-tshirt-black-m.jpg'
+FROM products p WHERE p.name = 'Nike Sport T-Shirt';
 
-	INSERT INTO products (name, description, price, stock, category_id, brand_id)
-	SELECT 'Jeans Pants', 'Classic blue jeans', 399000, 75, c.id, b.id
-	FROM categories c, brands b
-	WHERE c.name='Pants' AND b.name='Levi''s'
-	ON CONFLICT DO NOTHING;
+INSERT INTO product_variants (product_id, size, color, stock, price, image)
+SELECT p.id, 'L', 'White', 100, 300000, 'nike-tshirt-white-l.jpg'
+FROM products p WHERE p.name = 'Nike Sport T-Shirt';
 
-	INSERT INTO products (name, description, price, stock, category_id, brand_id)
-	SELECT 'Sneakers', 'Comfortable sneakers', 799000, 30, c.id, b.id
-	FROM categories c, brands b
-	WHERE c.name='Shoes' AND b.name='Puma'
-	ON CONFLICT DO NOTHING;
+-- Product 2: Adidas Jacket
+INSERT INTO products (name, description, min_price, max_price, stock, category_id, brand_id)
+SELECT 'Adidas Winter Jacket', 'Warm winter jacket with hood', 800000, 900000, 80,
+       c.id, b.id
+FROM categories c, brands b
+WHERE c.name = 'Jacket' AND b.name = 'Adidas';
 
-	INSERT INTO products (name, description, price, stock, category_id, brand_id)
-	SELECT 'Cap', 'Stylish baseball cap', 99000, 200, c.id, b.id
-	FROM categories c, brands b
-	WHERE c.name='Accessories' AND b.name='Zara'
-	ON CONFLICT DO NOTHING;
+-- Variants for Adidas Jacket
+INSERT INTO product_variants (product_id, size, color, stock, price, image)
+SELECT p.id, 'M', 'Blue', 40, 800000, 'adidas-jacket-blue-m.jpg'
+FROM products p WHERE p.name = 'Adidas Winter Jacket';
 
-	-- Insert variants for each product
-	INSERT INTO product_variants (product_id, size, color, sku, stock)
-	SELECT p.id, 'S', 'White', 'TSHIRT-S-WHT', 20 FROM products p WHERE p.name='Basic T-Shirt'
-	ON CONFLICT DO NOTHING;
+INSERT INTO product_variants (product_id, size, color, stock, price, image)
+SELECT p.id, 'L', 'Black', 40, 900000, 'adidas-jacket-black-l.jpg'
+FROM products p WHERE p.name = 'Adidas Winter Jacket';
 
-	INSERT INTO product_variants (product_id, size, color, sku, stock)
-	SELECT p.id, 'M', 'White', 'TSHIRT-M-WHT', 30 FROM products p WHERE p.name='Basic T-Shirt'
-	ON CONFLICT DO NOTHING;
+-- Product 3: Zara Pants
+INSERT INTO products (name, description, min_price, max_price, stock, category_id, brand_id)
+SELECT 'Zara Slim Fit Pants', 'Elegant slim fit trousers', 450000, 500000, 120,
+       c.id, b.id
+FROM categories c, brands b
+WHERE c.name = 'Pants' AND b.name = 'Zara';
 
-	INSERT INTO product_variants (product_id, size, color, sku, stock)
-	SELECT p.id, 'L', 'White', 'TSHIRT-L-WHT', 25 FROM products p WHERE p.name='Basic T-Shirt'
-	ON CONFLICT DO NOTHING;
+-- Variants for Zara Pants
+INSERT INTO product_variants (product_id, size, color, stock, price, image)
+SELECT p.id, '32', 'Gray', 60, 450000, 'zara-pants-gray-32.jpg'
+FROM products p WHERE p.name = 'Zara Slim Fit Pants';
 
-	INSERT INTO product_variants (product_id, size, color, sku, stock)
-	SELECT p.id, 'M', 'Black', 'JACKET-M-BLK', 25 FROM products p WHERE p.name='Running Jacket'
-	ON CONFLICT DO NOTHING;
+INSERT INTO product_variants (product_id, size, color, stock, price, image)
+SELECT p.id, '34', 'Black', 60, 500000, 'zara-pants-black-34.jpg'
+FROM products p WHERE p.name = 'Zara Slim Fit Pants';
 
-	INSERT INTO product_variants (product_id, size, color, sku, stock)
-	SELECT p.id, 'L', 'Black', 'JACKET-L-BLK', 25 FROM products p WHERE p.name='Running Jacket'
-	ON CONFLICT DO NOTHING;
+-- Product 4: H&M Shoes
+INSERT INTO products (name, description, min_price, max_price, stock, category_id, brand_id)
+SELECT 'H&M Casual Sneakers', 'Comfortable everyday sneakers', 350000, 400000, 200,
+       c.id, b.id
+FROM categories c, brands b
+WHERE c.name = 'Shoes' AND b.name = 'H&M';
 
-	INSERT INTO product_variants (product_id, size, color, sku, stock)
-	SELECT p.id, '30', 'Blue', 'JEANS-30-BLU', 25 FROM products p WHERE p.name='Jeans Pants'
-	ON CONFLICT DO NOTHING;
+-- Variants for H&M Shoes
+INSERT INTO product_variants (product_id, size, color, stock, price, image)
+SELECT p.id, '42', 'White', 100, 350000, 'hm-sneakers-white-42.jpg'
+FROM products p WHERE p.name = 'H&M Casual Sneakers';
 
-	INSERT INTO product_variants (product_id, size, color, sku, stock)
-	SELECT p.id, '32', 'Blue', 'JEANS-32-BLU', 25 FROM products p WHERE p.name='Jeans Pants'
-	ON CONFLICT DO NOTHING;
+INSERT INTO product_variants (product_id, size, color, stock, price, image)
+SELECT p.id, '43', 'Blue', 100, 400000, 'hm-sneakers-blue-43.jpg'
+FROM products p WHERE p.name = 'H&M Casual Sneakers';
 
-	INSERT INTO product_variants (product_id, size, color, sku, stock)
-	SELECT p.id, '34', 'Blue', 'JEANS-34-BLU', 25 FROM products p WHERE p.name='Jeans Pants'
-	ON CONFLICT DO NOTHING;
+-- Product 5: Levi's Accessories (Belt)
+INSERT INTO products (name, description, min_price, max_price, stock, category_id, brand_id)
+SELECT 'Levi''s Leather Belt', 'Classic leather belt', 150000, 180000, 90,
+       c.id, b.id
+FROM categories c, brands b
+WHERE c.name = 'Accessories' AND b.name = 'Levi''s';
 
-	INSERT INTO product_variants (product_id, size, color, sku, stock)
-	SELECT p.id, '8', 'White', 'SNEAKERS-8-WHT', 15 FROM products p WHERE p.name='Sneakers'
-	ON CONFLICT DO NOTHING;
+-- Variants for Levi's Belt
+INSERT INTO product_variants (product_id, size, color, stock, price, image)
+SELECT p.id, 'M', 'Brown', 45, 150000, 'levis-belt-brown-m.jpg'
+FROM products p WHERE p.name = 'Levi''s Leather Belt';
 
-	INSERT INTO product_variants (product_id, size, color, sku, stock)
-	SELECT p.id, '9', 'White', 'SNEAKERS-9-WHT', 15 FROM products p WHERE p.name='Sneakers'
-	ON CONFLICT DO NOTHING;
+INSERT INTO product_variants (product_id, size, color, stock, price, image)
+SELECT p.id, 'L', 'Black', 45, 180000, 'levis-belt-black-l.jpg'
+FROM products p WHERE p.name = 'Levi''s Leather Belt';
 
-	INSERT INTO product_variants (product_id, size, color, sku, stock)
-	SELECT p.id, 'One Size', 'Black', 'CAP-OS-BLK', 100 FROM products p WHERE p.name='Cap'
-	ON CONFLICT DO NOTHING;
+-- Admin user
+INSERT INTO users (email, password, role)
+VALUES ('admin@shop.com', '123456', 'admin');
 
-	INSERT INTO users (email, password, role)
-	VALUES ('admin@shop.com', '$2a$10$examplehashedpassword', 'admin')
-	ON CONFLICT DO NOTHING;
 	`
 
 	_, err := DB.Exec(context.Background(), sql)

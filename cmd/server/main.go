@@ -41,6 +41,10 @@ func main() {
 	// CORS middleware
 	r.Use(cors.Default())
 
+	r.GET("/", func(c *gin.Context) {
+		c.Redirect(302, "/swagger/index.html")
+	})
+
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "OK"})
 	})

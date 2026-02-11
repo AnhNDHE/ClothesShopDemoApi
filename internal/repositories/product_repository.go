@@ -21,10 +21,10 @@ func (r *ProductRepository) GetAllProducts(ctx context.Context, page, limit int,
 	offset := (page - 1) * limit
 
 	query := `
-		SELECT p.id, p.name, p.description, p.minprice, p.maxprice, p.total_stock, p.category_id, p.brand_id, p.created_by, p.created_at, p.updated_by, p.updated_at, p.is_active, p.is_deleted
+		SELECT p.id, p.name, p.description, p.min_price, p.max_price, p.stock, p.category_id, p.brand_id, p.created_at, p.updated_at, p.is_active
 		FROM products p
 		JOIN categories c ON p.category_id = c.id
-		WHERE p.is_active = true AND p.is_deleted = false
+		WHERE p.is_active = true
 	`
 
 	args := []interface{}{}
@@ -32,13 +32,13 @@ func (r *ProductRepository) GetAllProducts(ctx context.Context, page, limit int,
 
 	if minPrice != nil {
 		argCount++
-		query += ` AND p.minprice >= $` + strconv.Itoa(argCount)
+		query += ` AND p.min_price >= $` + strconv.Itoa(argCount)
 		args = append(args, *minPrice)
 	}
 
 	if maxPrice != nil {
 		argCount++
-		query += ` AND p.maxprice <= $` + strconv.Itoa(argCount)
+		query += ` AND p.max_price <= $` + strconv.Itoa(argCount)
 		args = append(args, *maxPrice)
 	}
 
@@ -68,7 +68,7 @@ func (r *ProductRepository) GetAllProducts(ctx context.Context, page, limit int,
 		var product models.Product
 		var brandID *string
 		err := rows.Scan(&product.ID, &product.Name, &product.Description, &product.MinPrice, &product.MaxPrice, &product.TotalStock, &product.CategoryID, &brandID,
-			&product.CreatedBy, &product.CreatedAt, &product.UpdatedBy, &product.UpdatedAt, &product.IsActive, &product.IsDeleted)
+			&product.CreatedAt, &product.UpdatedAt, &product.IsActive)
 		if err != nil {
 			return nil, err
 		}
@@ -111,9 +111,9 @@ func (r *ProductRepository) CreateProduct(ctx context.Context, name, description
 	}
 
 	query := `
-		INSERT INTO products (name, description, minprice, maxprice, total_stock, category_id, brand_id)
+		INSERT INTO products (name, description, min_price, max_price, stock, category_id, brand_id)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
-		RETURNING id, name, description, minprice, maxprice, total_stock, category_id, brand_id, created_by, created_at, updated_by, updated_at, is_active, is_deleted
+		RETURNING id, name, description, min_price, max_price, stock, category_id, brand_id, created_at, updated_at, is_active
 	`
 
 	var product models.Product
@@ -186,16 +186,15 @@ func (r *ProductRepository) UpdateProduct(ctx context.Context, id string, name, 
 
 	query := `
 		UPDATE products
-		SET name = $2, description = $3, minprice = $4, maxprice = $4, total_stock = $5, category_id = $6, brand_id = $7, updated_by = $8, updated_at = now()
+		SET name = $2, description = $3, min_price = $4, max_price = $4, stock = $5, category_id = $6, brand_id = $7, updated_at = now()
 		WHERE id = $1
-		RETURNING id, name, description, minprice, maxprice, total_stock, category_id, brand_id, created_by, created_at, updated_by, updated_at, is_active, is_deleted
+		RETURNING id, name, description, min_price, max_price, stock, category_id, brand_id, created_at, updated_at, is_active
 	`
 
 	var product models.Product
-	var createdByUUID *string
-	err = r.DB.QueryRow(ctx, query, id, name, description, price, stock, categoryID, brandID, updatedBy).Scan(
+	err = r.DB.QueryRow(ctx, query, id, name, description, price, stock, categoryID, brandID).Scan(
 		&product.ID, &product.Name, &product.Description, &product.MinPrice, &product.MaxPrice, &product.TotalStock, &product.CategoryID, &brandID,
-		&createdByUUID, &product.CreatedAt, &product.UpdatedBy, &product.UpdatedAt, &product.IsActive, &product.IsDeleted,
+		&product.CreatedAt, &product.UpdatedAt, &product.IsActive,
 	)
 	if err != nil {
 		return nil, err
@@ -241,9 +240,9 @@ func (r *ProductRepository) GetAllCategories(ctx context.Context) ([]models.Cate
 func (r *ProductRepository) ToggleActive(ctx context.Context, id string, updatedBy *string) (*models.Product, error) {
 	query := `
 		UPDATE products
-		SET is_active = NOT is_active, updated_by = $2, updated_at = now()
+		SET is_active = NOT is_active, updated_at = now()
 		WHERE id = $1
-		RETURNING id, name, minprice, maxprice, total_stock, category_id, created_by, created_at, updated_by, updated_at, is_active, is_deleted
+		RETURNING id, name, min_price, max_price, stock, category_id, created_at, updated_at, is_active
 	`
 
 	var product models.Product
@@ -262,9 +261,9 @@ func (r *ProductRepository) ToggleActive(ctx context.Context, id string, updated
 func (r *ProductRepository) SoftDelete(ctx context.Context, id string, updatedBy *string) (*models.Product, error) {
 	query := `
 		UPDATE products
-		SET is_deleted = true, updated_by = $2, updated_at = now()
+		SET is_deleted = true, updated_at = now()
 		WHERE id = $1
-		RETURNING id, name, description, minprice, maxprice, total_stock, category_id, brand_id, created_by, created_at, updated_by, updated_at, is_active, is_deleted
+		RETURNING id, name, description, min_price, max_price, stock, category_id, brand_id, created_at, updated_at, is_active, is_deleted
 	`
 
 	var product models.Product

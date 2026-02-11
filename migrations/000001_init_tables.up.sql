@@ -45,17 +45,14 @@ CREATE TABLE products (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name TEXT NOT NULL,
     description TEXT,
-    minprice NUMERIC DEFAULT 0,
-    maxprice NUMERIC DEFAULT 0,
-    total_stock INT DEFAULT 0,
+    min_price NUMERIC DEFAULT 0,
+    max_price NUMERIC DEFAULT 0,
+    stock INT DEFAULT 0,
     category_id UUID REFERENCES categories(id),
     brand_id UUID REFERENCES brands(id),
-    created_by UUID,
     created_at TIMESTAMP DEFAULT now(),
-    updated_by UUID,
     updated_at TIMESTAMP DEFAULT now(),
-    is_active BOOLEAN DEFAULT true,
-    is_deleted BOOLEAN DEFAULT false
+    is_active BOOLEAN DEFAULT true
 );
 
 -- PRODUCT VARIANTS
@@ -117,7 +114,7 @@ INSERT INTO brands (name, description) VALUES
 
 -- Products (5 records, each with 2 variants)
 -- Product 1: Nike T-Shirt
-INSERT INTO products (name, description, minprice, maxprice, total_stock, category_id, brand_id)
+INSERT INTO products (name, description, min_price, max_price, stock, category_id, brand_id)
 SELECT 'Nike Sport T-Shirt', 'Comfortable athletic t-shirt', 250000, 300000, 150,
        c.id, b.id
 FROM categories c, brands b
@@ -133,7 +130,7 @@ SELECT p.id, 'L', 'White', 100, 300000, 'nike-tshirt-white-l.jpg'
 FROM products p WHERE p.name = 'Nike Sport T-Shirt';
 
 -- Product 2: Adidas Jacket
-INSERT INTO products (name, description, minprice, maxprice, total_stock, category_id, brand_id)
+INSERT INTO products (name, description, min_price, max_price, stock, category_id, brand_id)
 SELECT 'Adidas Winter Jacket', 'Warm winter jacket with hood', 800000, 900000, 80,
        c.id, b.id
 FROM categories c, brands b
@@ -149,7 +146,7 @@ SELECT p.id, 'L', 'Black', 40, 900000, 'adidas-jacket-black-l.jpg'
 FROM products p WHERE p.name = 'Adidas Winter Jacket';
 
 -- Product 3: Zara Pants
-INSERT INTO products (name, description, minprice, maxprice, total_stock, category_id, brand_id)
+INSERT INTO products (name, description, min_price, max_price, stock, category_id, brand_id)
 SELECT 'Zara Slim Fit Pants', 'Elegant slim fit trousers', 450000, 500000, 120,
        c.id, b.id
 FROM categories c, brands b
@@ -165,7 +162,7 @@ SELECT p.id, '34', 'Black', 60, 500000, 'zara-pants-black-34.jpg'
 FROM products p WHERE p.name = 'Zara Slim Fit Pants';
 
 -- Product 4: H&M Shoes
-INSERT INTO products (name, description, minprice, maxprice, total_stock, category_id, brand_id)
+INSERT INTO products (name, description, min_price, max_price, stock, category_id, brand_id)
 SELECT 'H&M Casual Sneakers', 'Comfortable everyday sneakers', 350000, 400000, 200,
        c.id, b.id
 FROM categories c, brands b
@@ -181,7 +178,7 @@ SELECT p.id, '43', 'Blue', 100, 400000, 'hm-sneakers-blue-43.jpg'
 FROM products p WHERE p.name = 'H&M Casual Sneakers';
 
 -- Product 5: Levi's Accessories (Belt)
-INSERT INTO products (name, description, minprice, maxprice, total_stock, category_id, brand_id)
+INSERT INTO products (name, description, min_price, max_price, stock, category_id, brand_id)
 SELECT 'Levi''s Leather Belt', 'Classic leather belt', 150000, 180000, 90,
        c.id, b.id
 FROM categories c, brands b
