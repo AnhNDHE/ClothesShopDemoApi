@@ -67,13 +67,22 @@ func main() {
 	}
 
 	// SWAGGER_HOST (flexible cho local / production)
+	var swaggerScheme string
 	swaggerHost := os.Getenv("SWAGGER_HOST")
 	if swaggerHost == "" {
 		swaggerHost = "localhost:" + port // local default
+		swaggerScheme = "http"
+	} else {
+		swaggerScheme = "https" // production default to https
 	}
 
-	// Swagger with dynamic host
-	swaggerURL := "http://" + swaggerHost + "/swagger/doc.json"
+	// SWAGGER_SCHEME (override if set)
+	if envScheme := os.Getenv("SWAGGER_SCHEME"); envScheme != "" {
+		swaggerScheme = envScheme
+	}
+
+	// Swagger with dynamic host and scheme
+	swaggerURL := swaggerScheme + "://" + swaggerHost + "/swagger/doc.json"
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler, ginSwagger.URL(swaggerURL)))
 
 	log.Println("🚀 Server running on port:", port)
