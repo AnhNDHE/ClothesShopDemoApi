@@ -11,15 +11,15 @@ import (
 func SetupRoutes(r *gin.Engine, jwtSecret string) {
 	// Initialize repositories
 	productRepo := repositories.NewProductRepository(config.DB)
-	//userRepo := repositories.NewUserRepository(config.DB)
+	userRepo := repositories.NewUserRepository(config.DB)
 
 	// Initialize handlers
 	productHandler := handlers.NewProductHandler(productRepo)
-	//authHandler := handlers.NewAuthHandler(userRepo, jwtSecret)
+	authHandler := handlers.NewAuthHandler(userRepo, jwtSecret)
 
 	// Auth routes
-	//r.POST("/register", authHandler.Register)
-	//r.POST("/login", authHandler.Login)
+	r.POST("/register", authHandler.Register)
+	r.POST("/login", authHandler.Login)
 
 	// Product routes
 	r.GET("/products", productHandler.GetAllProducts)
