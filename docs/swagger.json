@@ -3,20 +3,37 @@
     "info": {
         "description": "A RESTful API for a clothes shop built with Golang and Gin.",
         "title": "Clothes Shop API",
-        "termsOfService": "http://swagger.io/terms/",
-        "contact": {
-            "name": "API Support",
-            "url": "http://www.swagger.io/support",
-            "email": "support@swagger.io"
-        },
-        "license": {
-            "name": "Apache 2.0",
-            "url": "http://www.apache.org/licenses/LICENSE-2.0.html"
-        },
+        "contact": {},
         "version": "1.0"
     },
     "basePath": "/",
     "paths": {
+        "/brands": {
+            "get": {
+                "description": "Retrieve a list of all brands",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "brands"
+                ],
+                "summary": "Get all brands",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/models.Brand"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/categories": {
             "get": {
                 "description": "Retrieve a list of all categories",
@@ -90,6 +107,88 @@
                             "additionalProperties": {
                                 "type": "string"
                             }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/product-variants/{id}/soft-delete": {
+            "delete": {
+                "description": "Mark a product variant as deleted (soft delete)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "product-variants"
+                ],
+                "summary": "Soft delete a product variant",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Product Variant ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.ProductVariant"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/product-variants/{id}/toggle-active": {
+            "patch": {
+                "description": "Toggle the active status of a product variant (activate/deactivate)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "product-variants"
+                ],
+                "summary": "Toggle product variant active status",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Product Variant ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.ProductVariant"
                         }
                     },
                     "500": {
@@ -431,8 +530,7 @@
             "required": [
                 "category_name",
                 "name",
-                "price",
-                "stock"
+                "variants"
             ],
             "properties": {
                 "brand_name": {
@@ -447,16 +545,9 @@
                 "name": {
                     "type": "string"
                 },
-                "price": {
-                    "type": "number",
-                    "minimum": 0
-                },
-                "stock": {
-                    "type": "integer",
-                    "minimum": 0
-                },
                 "variants": {
                     "type": "array",
+                    "minItems": 1,
                     "items": {
                         "$ref": "#/definitions/handlers.VariantRequest"
                     }
@@ -502,8 +593,7 @@
             "required": [
                 "category_name",
                 "name",
-                "price",
-                "stock"
+                "variants"
             ],
             "properties": {
                 "brand_name": {
@@ -518,16 +608,9 @@
                 "name": {
                     "type": "string"
                 },
-                "price": {
-                    "type": "number",
-                    "minimum": 0
-                },
-                "stock": {
-                    "type": "integer",
-                    "minimum": 0
-                },
                 "variants": {
                     "type": "array",
+                    "minItems": 1,
                     "items": {
                         "$ref": "#/definitions/handlers.VariantRequest"
                     }
@@ -559,6 +642,35 @@
                 "stock": {
                     "type": "integer",
                     "minimum": 0
+                }
+            }
+        },
+        "models.Brand": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "created_by": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "is_deleted": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "updated_by": {
+                    "type": "string"
                 }
             }
         },
@@ -621,10 +733,10 @@
                 "is_deleted": {
                     "type": "boolean"
                 },
-                "maxprice": {
+                "max_price": {
                     "type": "number"
                 },
-                "minprice": {
+                "min_price": {
                     "type": "number"
                 },
                 "name": {

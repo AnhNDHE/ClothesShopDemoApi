@@ -64,7 +64,9 @@ func main() {
 	// 🔥 FIX SWAGGER HOST + SCHEME
 	// =============================
 	swaggerHost := os.Getenv("SWAGGER_HOST")
-	if swaggerHost == "" {
+
+	// If no SWAGGER_HOST set OR running locally (no PORT env var), use localhost
+	if swaggerHost == "" || os.Getenv("PORT") == "" {
 		swaggerHost = "localhost:" + port
 	}
 

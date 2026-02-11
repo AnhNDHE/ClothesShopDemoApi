@@ -23,21 +23,17 @@ type VariantRequest struct {
 type CreateProductRequest struct {
 	Name         string           `json:"name" binding:"required"`
 	Description  string           `json:"description"`
-	Price        float64          `json:"price" binding:"required,min=0"`
-	Stock        int              `json:"stock" binding:"required,min=0"`
 	CategoryName string           `json:"category_name" binding:"required"`
 	BrandName    string           `json:"brand_name"`
-	Variants     []VariantRequest `json:"variants"`
+	Variants     []VariantRequest `json:"variants" binding:"required,min=1"`
 }
 
 type UpdateProductRequest struct {
 	Name         string           `json:"name" binding:"required"`
 	Description  string           `json:"description"`
-	Price        float64          `json:"price" binding:"required,min=0"`
-	Stock        int              `json:"stock" binding:"required,min=0"`
 	CategoryName string           `json:"category_name" binding:"required"`
 	BrandName    string           `json:"brand_name"`
-	Variants     []VariantRequest `json:"variants"`
+	Variants     []VariantRequest `json:"variants" binding:"required,min=1"`
 }
 
 func NewProductHandler(repo *repositories.ProductRepository) *ProductHandler {
@@ -123,11 +119,65 @@ func (h *ProductHandler) CreateProduct(c *gin.Context) {
 		return
 	}
 
-	product, err := h.repo.CreateProduct(c.Request.Context(), req.Name, req.Description, req.Price, req.Stock, req.CategoryName, req.BrandName)
+	// Calculate min_price, max_price, total_stock from variants
+	minPrice := req.Variants[0].Price
+	maxPrice := req.Variants[0].Price
+	totalStock := req.Variants[0].Stock
+
+	for _, variant := range req.Variants {
+		if variant.Price < minPrice {
+			minPrice = variant.Price
+		}
+		if variant.Price > maxPrice {
+			maxPrice = variant.Price
+		}
+		totalStock += variant.Stock
+	}
+
+	product, err := h.repo.CreateProduct(c.Request.Context(), req.Name, req.Description, minPrice, maxPrice, totalStock, req.CategoryName, req.BrandName)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
+	// Create variants
+	variants := make([]struct {
+		Size  string
+		Color string
+		Stock int
+		Price float64
+		Image string
+	}, len(req.Variants))
+
+	for i, v := range req.Variants {
+		variants[i] = struct {
+			Size  string
+			Color string
+			Stock int
+			Price float64
+			Image string
+		}{
+			Size:  v.Size,
+			Color: v.Color,
+			Stock: v.Stock,
+			Price: v.Price,
+			Image: v.Image,
+		}
+	}
+
+	err = h.repo.CreateProductVariants(c.Request.Context(), product.ID.String(), variants)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create product variants"})
+		return
+	}
+
+	// Load the variants into the product response
+	productVariants, err := h.repo.GetProductVariants(c.Request.Context(), product.ID.String())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load product variants"})
+		return
+	}
+	product.Variants = productVariants
 
 	c.JSON(http.StatusCreated, product)
 }
@@ -152,44 +202,65 @@ func (h *ProductHandler) UpdateProduct(c *gin.Context) {
 		return
 	}
 
-	product, err := h.repo.UpdateProduct(c.Request.Context(), id, req.Name, req.Description, req.Price, req.Stock, req.CategoryName, req.BrandName, nil)
+	// Calculate min_price, max_price, total_stock from variants
+	minPrice := req.Variants[0].Price
+	maxPrice := req.Variants[0].Price
+	totalStock := req.Variants[0].Stock
+
+	for _, variant := range req.Variants {
+		if variant.Price < minPrice {
+			minPrice = variant.Price
+		}
+		if variant.Price > maxPrice {
+			maxPrice = variant.Price
+		}
+		totalStock += variant.Stock
+	}
+
+	product, err := h.repo.UpdateProduct(c.Request.Context(), id, req.Name, req.Description, minPrice, maxPrice, totalStock, req.CategoryName, req.BrandName, nil)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update product"})
 		return
 	}
 
-	// Update variants if provided
-	if len(req.Variants) > 0 {
-		variants := make([]struct {
+	// Update variants
+	variants := make([]struct {
+		Size  string
+		Color string
+		Stock int
+		Price float64
+		Image string
+	}, len(req.Variants))
+
+	for i, v := range req.Variants {
+		variants[i] = struct {
 			Size  string
 			Color string
 			Stock int
 			Price float64
 			Image string
-		}, len(req.Variants))
-
-		for i, v := range req.Variants {
-			variants[i] = struct {
-				Size  string
-				Color string
-				Stock int
-				Price float64
-				Image string
-			}{
-				Size:  v.Size,
-				Color: v.Color,
-				Stock: v.Stock,
-				Price: v.Price,
-				Image: v.Image,
-			}
-		}
-
-		err = h.repo.UpdateProductVariants(c.Request.Context(), id, variants)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update product variants"})
-			return
+		}{
+			Size:  v.Size,
+			Color: v.Color,
+			Stock: v.Stock,
+			Price: v.Price,
+			Image: v.Image,
 		}
 	}
+
+	err = h.repo.UpdateProductVariants(c.Request.Context(), id, variants)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update product variants"})
+		return
+	}
+
+	// Load the variants into the product response
+	productVariants, err := h.repo.GetProductVariants(c.Request.Context(), product.ID.String())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load product variants"})
+		return
+	}
+	product.Variants = productVariants
 
 	c.JSON(http.StatusOK, product)
 }
@@ -212,6 +283,24 @@ func (h *ProductHandler) GetAllCategories(c *gin.Context) {
 	c.JSON(http.StatusOK, categories)
 }
 
+// GetAllBrands godoc
+// @Summary Get all brands
+// @Description Retrieve a list of all brands
+// @Tags brands
+// @Accept  json
+// @Produce  json
+// @Success 200 {array} models.Brand
+// @Router /brands [get]
+func (h *ProductHandler) GetAllBrands(c *gin.Context) {
+	brands, err := h.repo.GetAllBrands(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, brands)
+}
+
 // ToggleActive godoc
 // @Summary Toggle product active status
 // @Description Toggle the active status of a product (activate/deactivate)
@@ -227,7 +316,7 @@ func (h *ProductHandler) ToggleActive(c *gin.Context) {
 
 	product, err := h.repo.ToggleActive(c.Request.Context(), id, nil)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to toggle product active status"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -249,7 +338,7 @@ func (h *ProductHandler) SoftDelete(c *gin.Context) {
 
 	product, err := h.repo.SoftDelete(c.Request.Context(), id, nil)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to soft delete product"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 

@@ -21,10 +21,10 @@ func (r *ProductRepository) GetAllProducts(ctx context.Context, page, limit int,
 	offset := (page - 1) * limit
 
 	query := `
-		SELECT p.id, p.name, p.description, p.min_price, p.max_price, p.stock, p.category_id, p.brand_id, p.created_at, p.updated_at, p.is_active
+		SELECT p.id, p.name, p.description, p.min_price, p.max_price, p.total_stock, p.category_id, p.brand_id, p.created_at, p.updated_at, p.is_active, p.is_deleted
 		FROM products p
 		JOIN categories c ON p.category_id = c.id
-		WHERE p.is_active = true
+		WHERE p.is_active = true AND p.is_deleted = false
 	`
 
 	args := []interface{}{}
@@ -68,7 +68,7 @@ func (r *ProductRepository) GetAllProducts(ctx context.Context, page, limit int,
 		var product models.Product
 		var brandID *string
 		err := rows.Scan(&product.ID, &product.Name, &product.Description, &product.MinPrice, &product.MaxPrice, &product.TotalStock, &product.CategoryID, &brandID,
-			&product.CreatedAt, &product.UpdatedAt, &product.IsActive)
+			&product.CreatedAt, &product.UpdatedAt, &product.IsActive, &product.IsDeleted)
 		if err != nil {
 			return nil, err
 		}
@@ -91,7 +91,7 @@ func (r *ProductRepository) GetAllProducts(ctx context.Context, page, limit int,
 	return products, nil
 }
 
-func (r *ProductRepository) CreateProduct(ctx context.Context, name, description string, price float64, stock int, categoryName, brandName string) (*models.Product, error) {
+func (r *ProductRepository) CreateProduct(ctx context.Context, name, description string, minPrice, maxPrice float64, totalStock int, categoryName, brandName string) (*models.Product, error) {
 	// First, get the category ID by name
 	var categoryID string
 	err := r.DB.QueryRow(ctx, "SELECT id FROM categories WHERE name = $1", categoryName).Scan(&categoryID)
@@ -111,16 +111,15 @@ func (r *ProductRepository) CreateProduct(ctx context.Context, name, description
 	}
 
 	query := `
-		INSERT INTO products (name, description, min_price, max_price, stock, category_id, brand_id)
+		INSERT INTO products (name, description, min_price, max_price, total_stock, category_id, brand_id)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
-		RETURNING id, name, description, min_price, max_price, stock, category_id, brand_id, created_at, updated_at, is_active
+		RETURNING id, name, description, min_price, max_price, total_stock, category_id, brand_id, created_at, updated_at, is_active, is_deleted, created_by, updated_by
 	`
 
 	var product models.Product
-	var createdByUUID, updatedByUUID *string
-	err = r.DB.QueryRow(ctx, query, name, description, price, price, stock, categoryID, brandID).Scan(
+	err = r.DB.QueryRow(ctx, query, name, description, minPrice, maxPrice, totalStock, categoryID, brandID).Scan(
 		&product.ID, &product.Name, &product.Description, &product.MinPrice, &product.MaxPrice, &product.TotalStock, &product.CategoryID, &brandID,
-		&createdByUUID, &product.CreatedAt, &updatedByUUID, &product.UpdatedAt, &product.IsActive, &product.IsDeleted,
+		&product.CreatedAt, &product.UpdatedAt, &product.IsActive, &product.IsDeleted, &product.CreatedBy, &product.UpdatedBy,
 	)
 	if err != nil {
 		return nil, err
@@ -165,7 +164,7 @@ func (r *ProductRepository) GetProductVariants(ctx context.Context, productID st
 	return variants, nil
 }
 
-func (r *ProductRepository) UpdateProduct(ctx context.Context, id string, name, description string, price float64, stock int, categoryName, brandName string, updatedBy *string) (*models.Product, error) {
+func (r *ProductRepository) UpdateProduct(ctx context.Context, id string, name, description string, minPrice, maxPrice float64, totalStock int, categoryName, brandName string, updatedBy *string) (*models.Product, error) {
 	// First, get the category ID by name
 	var categoryID string
 	err := r.DB.QueryRow(ctx, "SELECT id FROM categories WHERE name = $1", categoryName).Scan(&categoryID)
@@ -186,16 +185,17 @@ func (r *ProductRepository) UpdateProduct(ctx context.Context, id string, name, 
 
 	query := `
 		UPDATE products
-		SET name = $2, description = $3, min_price = $4, max_price = $4, stock = $5, category_id = $6, brand_id = $7, updated_at = now()
+		SET name = $2, description = $3, min_price = $4, max_price = $5, total_stock = $6, category_id = $7, brand_id = $8, updated_at = now()
 		WHERE id = $1
-		RETURNING id, name, description, min_price, max_price, stock, category_id, brand_id, created_at, updated_at, is_active
+		RETURNING id, name, description, min_price, max_price, total_stock, category_id, brand_id, created_at, updated_at, is_active
 	`
 
 	var product models.Product
-	err = r.DB.QueryRow(ctx, query, id, name, description, price, stock, categoryID, brandID).Scan(
+	err = r.DB.QueryRow(ctx, query, id, name, description, minPrice, maxPrice, totalStock, categoryID, brandID).Scan(
 		&product.ID, &product.Name, &product.Description, &product.MinPrice, &product.MaxPrice, &product.TotalStock, &product.CategoryID, &brandID,
 		&product.CreatedAt, &product.UpdatedAt, &product.IsActive,
 	)
+
 	if err != nil {
 		return nil, err
 	}
@@ -237,19 +237,44 @@ func (r *ProductRepository) GetAllCategories(ctx context.Context) ([]models.Cate
 	return categories, nil
 }
 
+func (r *ProductRepository) GetAllBrands(ctx context.Context) ([]models.Brand, error) {
+	query := `
+		SELECT id, name
+		FROM brands
+		ORDER BY name
+	`
+
+	rows, err := r.DB.Query(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var brands []models.Brand
+	for rows.Next() {
+		var brand models.Brand
+		err := rows.Scan(&brand.ID, &brand.Name)
+		if err != nil {
+			return nil, err
+		}
+		brands = append(brands, brand)
+	}
+
+	return brands, nil
+}
+
 func (r *ProductRepository) ToggleActive(ctx context.Context, id string, updatedBy *string) (*models.Product, error) {
 	query := `
 		UPDATE products
 		SET is_active = NOT is_active, updated_at = now()
 		WHERE id = $1
-		RETURNING id, name, min_price, max_price, stock, category_id, created_at, updated_at, is_active
+		RETURNING id, name, description, min_price, max_price, total_stock, category_id, brand_id, created_by, created_at, updated_by, updated_at, is_active, is_deleted
 	`
 
 	var product models.Product
-	var createdByUUID *string
-	err := r.DB.QueryRow(ctx, query, id, updatedBy).Scan(
-		&product.ID, &product.Name, &product.MinPrice, &product.MaxPrice, &product.TotalStock, &product.CategoryID,
-		&createdByUUID, &product.CreatedAt, &product.UpdatedBy, &product.UpdatedAt, &product.IsActive, &product.IsDeleted,
+	err := r.DB.QueryRow(ctx, query, id).Scan(
+		&product.ID, &product.Name, &product.Description, &product.MinPrice, &product.MaxPrice, &product.TotalStock, &product.CategoryID, &product.BrandID,
+		&product.CreatedBy, &product.CreatedAt, &product.UpdatedBy, &product.UpdatedAt, &product.IsActive, &product.IsDeleted,
 	)
 	if err != nil {
 		return nil, err
@@ -263,25 +288,16 @@ func (r *ProductRepository) SoftDelete(ctx context.Context, id string, updatedBy
 		UPDATE products
 		SET is_deleted = true, updated_at = now()
 		WHERE id = $1
-		RETURNING id, name, description, min_price, max_price, stock, category_id, brand_id, created_at, updated_at, is_active, is_deleted
+		RETURNING id, name, description, min_price, max_price, total_stock, category_id, brand_id, created_by, created_at, updated_by, updated_at, is_active, is_deleted
 	`
 
 	var product models.Product
-	var createdByUUID, brandID *string
-	err := r.DB.QueryRow(ctx, query, id, updatedBy).Scan(
-		&product.ID, &product.Name, &product.Description, &product.MinPrice, &product.MaxPrice, &product.TotalStock, &product.CategoryID, &brandID,
-		&createdByUUID, &product.CreatedAt, &product.UpdatedBy, &product.UpdatedAt, &product.IsActive, &product.IsDeleted,
+	err := r.DB.QueryRow(ctx, query, id).Scan(
+		&product.ID, &product.Name, &product.Description, &product.MinPrice, &product.MaxPrice, &product.TotalStock, &product.CategoryID, &product.BrandID,
+		&product.CreatedBy, &product.CreatedAt, &product.UpdatedBy, &product.UpdatedAt, &product.IsActive, &product.IsDeleted,
 	)
 	if err != nil {
 		return nil, err
-	}
-
-	if brandID != nil {
-		parsedUUID, err := uuid.Parse(*brandID)
-		if err != nil {
-			return nil, err
-		}
-		product.BrandID = &parsedUUID
 	}
 
 	return &product, nil

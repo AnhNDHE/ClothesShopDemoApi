@@ -1,4 +1,4 @@
-# TODO List for Clothes Shop API Project
+nh là t value của di# TODO List for Clothes Shop API Project
 
 - [x] Initialize Go module with `go mod init clothes-shop-api`
 - [x] Install required Go libraries (gin, pgx/v5, pgxpool, godotenv, uuid)
@@ -22,3 +22,5 @@
 - [x] Generate Swagger documentation
 - [x] Update main.go to serve Swagger UI
 - [x] Update README with Swagger instructions
+- [x] Fix product repository to use minPrice, maxPrice, totalStock parameters
+- [x] Test server startup and API endpoints

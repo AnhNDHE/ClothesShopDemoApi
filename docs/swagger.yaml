@@ -17,21 +17,15 @@ definitions:
         type: string
       name:
         type: string
-      price:
-        minimum: 0
-        type: number
-      stock:
-        minimum: 0
-        type: integer
       variants:
         items:
           $ref: '#/definitions/handlers.VariantRequest'
+        minItems: 1
         type: array
     required:
     - category_name
     - name
-    - price
-    - stock
+    - variants
     type: object
   handlers.LoginRequest:
     properties:
@@ -66,21 +60,15 @@ definitions:
         type: string
       name:
         type: string
-      price:
-        minimum: 0
-        type: number
-      stock:
-        minimum: 0
-        type: integer
       variants:
         items:
           $ref: '#/definitions/handlers.VariantRequest'
+        minItems: 1
         type: array
     required:
     - category_name
     - name
-    - price
-    - stock
+    - variants
     type: object
   handlers.VariantRequest:
     properties:
@@ -101,6 +89,25 @@ definitions:
     - price
     - size
     - stock
+    type: object
+  models.Brand:
+    properties:
+      created_at:
+        type: string
+      created_by:
+        type: string
+      id:
+        type: string
+      is_active:
+        type: boolean
+      is_deleted:
+        type: boolean
+      name:
+        type: string
+      updated_at:
+        type: string
+      updated_by:
+        type: string
     type: object
   models.Category:
     properties:
@@ -141,9 +148,9 @@ definitions:
         type: boolean
       is_deleted:
         type: boolean
-      maxprice:
+      max_price:
         type: number
-      minprice:
+      min_price:
         type: number
       name:
         type: string
@@ -211,18 +218,28 @@ definitions:
         type: string
     type: object
 info:
-  contact:
-    email: support@swagger.io
-    name: API Support
-    url: http://www.swagger.io/support
+  contact: {}
   description: A RESTful API for a clothes shop built with Golang and Gin.
-  license:
-    name: Apache 2.0
-    url: http://www.apache.org/licenses/LICENSE-2.0.html
-  termsOfService: http://swagger.io/terms/
   title: Clothes Shop API
   version: "1.0"
 paths:
+  /brands:
+    get:
+      consumes:
+      - application/json
+      description: Retrieve a list of all brands
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Brand'
+            type: array
+      summary: Get all brands
+      tags:
+      - brands
   /categories:
     get:
       consumes:
@@ -280,6 +297,60 @@ paths:
       summary: Login user
       tags:
       - auth
+  /product-variants/{id}/soft-delete:
+    delete:
+      consumes:
+      - application/json
+      description: Mark a product variant as deleted (soft delete)
+      parameters:
+      - description: Product Variant ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.ProductVariant'
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Soft delete a product variant
+      tags:
+      - product-variants
+  /product-variants/{id}/toggle-active:
+    patch:
+      consumes:
+      - application/json
+      description: Toggle the active status of a product variant (activate/deactivate)
+      parameters:
+      - description: Product Variant ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.ProductVariant'
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Toggle product variant active status
+      tags:
+      - product-variants
   /products:
     get:
       consumes:

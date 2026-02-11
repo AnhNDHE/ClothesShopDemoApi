@@ -1,7 +1,9 @@
 package models
 
+import "github.com/google/uuid"
+
 type Brand struct {
-	Name        string `json:"name" db:"name"`
-	Description string `json:"description" db:"description"`
+	ID   uuid.UUID `json:"id"`
+	Name string    `json:"name"`
 	BaseModel
 }
