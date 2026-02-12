@@ -4,7 +4,7 @@ services:
   postgres:
     image: postgres:15
     environment:
-      POSTGRES_DB: mydb
+      POSTGRES_DB: ClothesShopDB
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: 123456789
     ports:

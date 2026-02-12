@@ -25,14 +25,14 @@ func (r *UserRepository) CreateUser(ctx context.Context, email, password, role s
 	}
 
 	query := `
-		INSERT INTO users (email, password, role)
-		VALUES ($1, $2, $3)
-		RETURNING id, email, password, role, created_at
+		INSERT INTO users (email, password, role, is_active)
+		VALUES ($1, $2, $3, false)
+		RETURNING id, email, password, role, created_at, updated_at, created_by, updated_by, is_active, is_deleted
 	`
 
 	var user models.User
 	err = r.DB.QueryRow(ctx, query, email, string(hashedPassword), role).Scan(
-		&user.ID, &user.Email, &user.Password, &user.Role, &user.CreatedAt,
+		&user.ID, &user.Email, &user.Password, &user.Role, &user.CreatedAt, &user.UpdatedAt, &user.CreatedBy, &user.UpdatedBy, &user.IsActive, &user.IsDeleted,
 	)
 	if err != nil {
 		return nil, err
@@ -43,14 +43,14 @@ func (r *UserRepository) CreateUser(ctx context.Context, email, password, role s
 
 func (r *UserRepository) GetUserByEmail(ctx context.Context, email string) (*models.User, error) {
 	query := `
-		SELECT id, email, password, role, created_at
+		SELECT id, email, password, role, created_at, updated_at, created_by, updated_by, is_active, is_deleted
 		FROM users
 		WHERE email = $1
 	`
 
 	var user models.User
 	err := r.DB.QueryRow(ctx, query, email).Scan(
-		&user.ID, &user.Email, &user.Password, &user.Role, &user.CreatedAt,
+		&user.ID, &user.Email, &user.Password, &user.Role, &user.CreatedAt, &user.UpdatedAt, &user.CreatedBy, &user.UpdatedBy, &user.IsActive, &user.IsDeleted,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -65,4 +65,15 @@ func (r *UserRepository) GetUserByEmail(ctx context.Context, email string) (*mod
 func (r *UserRepository) CheckPassword(hashedPassword, password string) bool {
 	err := bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(password))
 	return err == nil
+}
+
+func (r *UserRepository) ActivateUser(ctx context.Context, userID string) error {
+	query := `
+		UPDATE users
+		SET is_active = true, updated_at = now()
+		WHERE id = $1
+	`
+
+	_, err := r.DB.Exec(ctx, query, userID)
+	return err
 }

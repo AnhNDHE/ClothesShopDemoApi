@@ -6,7 +6,12 @@ CREATE TABLE users (
     email TEXT UNIQUE NOT NULL,
     password TEXT NOT NULL,
     role TEXT DEFAULT 'customer',
-    created_at TIMESTAMP DEFAULT now()
+    created_at TIMESTAMP DEFAULT now(),
+    updated_at TIMESTAMP DEFAULT now(),
+    created_by UUID,
+    updated_by UUID,
+    is_active BOOLEAN DEFAULT false,
+    is_deleted BOOLEAN DEFAULT false
 );
 
 -- CATEGORIES
@@ -80,25 +85,25 @@ CREATE TABLE orders (
     created_at TIMESTAMP DEFAULT now()
 );
 
--- -- Admin user
--- INSERT INTO users (email, password, role)
--- VALUES ('admin@shop.com', '123456', 'admin');
+-- Admin user (password is hashed version of '123456')
+INSERT INTO users (email, password, role)
+VALUES ('admin@shop.com', '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'admin');
 
--- -- Categories (5 records)
--- INSERT INTO categories (name, description) VALUES
--- ('T-Shirt', 'Comfortable cotton t-shirts'),
--- ('Jacket', 'Stylish jackets for all seasons'),
--- ('Pants', 'Various types of pants and trousers'),
--- ('Shoes', 'Footwear for men and women'),
--- ('Accessories', 'Fashion accessories and jewelry');
+-- Categories (5 records)
+INSERT INTO categories (name, description) VALUES
+('T-Shirt', 'Comfortable cotton t-shirts'),
+('Jacket', 'Stylish jackets for all seasons'),
+('Pants', 'Various types of pants and trousers'),
+('Shoes', 'Footwear for men and women'),
+('Accessories', 'Fashion accessories and jewelry');
 
--- -- Brands (5 records)
--- INSERT INTO brands (name, description) VALUES
--- ('Nike', 'Leading sportswear brand'),
--- ('Adidas', 'Global sports and lifestyle brand'),
--- ('Zara', 'Fast fashion retailer'),
--- ('H&M', 'Affordable fashion brand'),
--- ('Levi''s', 'Iconic denim brand');
+-- Brands (5 records)
+INSERT INTO brands (name, description) VALUES
+('Nike', 'Leading sportswear brand'),
+('Adidas', 'Global sports and lifestyle brand'),
+('Zara', 'Fast fashion retailer'),
+('H&M', 'Affordable fashion brand'),
+('Levi''s', 'Iconic denim brand');
 
 -- -- Products (5 records, each with 2 variants)
 -- -- Product 1: Nike T-Shirt

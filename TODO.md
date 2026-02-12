@@ -1,26 +1,14 @@
-nhlà nh là t value của di# TODO List for Clothes Shop API Project
+# Email Verification Implementation
 
-- [x] Initialize Go module with `go mod init clothes-shop-api`
-- [x] Install required Go libraries (gin, pgx/v5, pgxpool, godotenv, uuid)
-- [x] Create project directory structure
-- [x] Create .env file
-- [x] Create internal/config/config.go
-- [x] Create internal/db/postgres.go
-- [x] Create cmd/server/main.go
-- [x] Create empty model files (user.go, category.go, product.go, cart.go, order.go)
-- [x] Create empty handler, repository, route directories/files
-- [x] Create migration files (000001_init_tables.up.sql and down.sql)
-- [x] Install golang-migrate CLI
-- [x] Create Dockerfile
-- [x] Create docker-compose.yml
-- [x] Create README.md
-- [x] Run migration up to create tables and seed data
-- [x] Test the server by running it
-- [x] Add Swagger support for API testing
-- [x] Install Swagger libraries (swaggo/swag, gin-swagger)
-- [x] Create basic API endpoints with Swagger annotations
-- [x] Generate Swagger documentation
-- [x] Update main.go to serve Swagger UI
-- [x] Update README with Swagger instructions
-- [x] Fix product repository to use minPrice, maxPrice, totalStock parameters
-- [x] Test server startup and API endpoints
+## Completed Tasks
+- [x] Update migrations/000001_init_tables.up.sql: Add base fields to users table, set is_active DEFAULT false
+- [x] Update internal/config/config.go: Add SMTP config fields and load them in LoadConfig
+- [x] Create internal/services/email_service.go: Email service using net/smtp to send verification emails
+- [x] Update internal/repositories/user_repository.go: Modify CreateUser to set is_active=false, update GetUserByEmail to include is_active, add ActivateUser method
+- [x] Update internal/handlers/auth_handler.go: Modify Register to send verification email instead of activating, add VerifyEmail handler, update Login to check is_active
+- [x] Update internal/routes/routes.go: Add /auth/verify-email route
+- [x] Update Swagger docs for new endpoint
+
+## Pending Tasks
+- [x] Run migration to update database
+- [x] Test email sending and verification flow

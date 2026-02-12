@@ -4,22 +4,29 @@ import (
 	"clothes-shop-api/internal/config"
 	"clothes-shop-api/internal/handlers"
 	"clothes-shop-api/internal/repositories"
+	"clothes-shop-api/internal/services"
 
 	"github.com/gin-gonic/gin"
 )
 
 func SetupRoutes(r *gin.Engine, jwtSecret string) {
+	cfg := config.LoadConfig()
+
 	// Initialize repositories
 	productRepo := repositories.NewProductRepository(config.DB)
 	userRepo := repositories.NewUserRepository(config.DB)
 
+	// Initialize services
+	emailService := services.NewEmailService(cfg)
+
 	// Initialize handlers
 	productHandler := handlers.NewProductHandler(productRepo)
-	authHandler := handlers.NewAuthHandler(userRepo, jwtSecret)
+	authHandler := handlers.NewAuthHandler(userRepo, emailService, jwtSecret, cfg)
 
 	// Auth routes
-	r.POST("/register", authHandler.Register)
-	r.POST("/login", authHandler.Login)
+	r.POST("/auth/register", authHandler.Register)
+	r.POST("/auth/login", authHandler.Login)
+	r.GET("/auth/verify-email", authHandler.VerifyEmail)
 
 	// Product routes
 	r.GET("/products", productHandler.GetAllProducts)

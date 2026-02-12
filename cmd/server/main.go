@@ -35,7 +35,13 @@ func main() {
 	r := gin.Default()
 
 	// CORS (open for demo)
-	r.Use(cors.Default())
+	r.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"*"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"*"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+	}))
 
 	// Root → redirect to swagger
 	r.GET("/", func(c *gin.Context) {

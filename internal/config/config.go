@@ -12,7 +12,14 @@ import (
 var DB *pgxpool.Pool
 
 type Config struct {
-	JWTSecret string
+	JWTSecret        string
+	SMTPHost         string
+	SMTPPort         string
+	SMTPUsername     string
+	SMTPPassword     string
+	EmailFrom        string
+	AppBaseURLLocal  string
+	AppBaseURLDeploy string
 }
 
 // InitDB initializes the PostgreSQL connection
@@ -62,7 +69,6 @@ func InitDB() {
 func RunMigration() {
 	sql := `
 	-- Drop tables if they exist (for development)
-	DROP TABLE IF EXISTS order_items CASCADE;
 	DROP TABLE IF EXISTS orders CASCADE;
 	DROP TABLE IF EXISTS cart_items CASCADE;
 	DROP TABLE IF EXISTS carts CASCADE;
@@ -80,7 +86,12 @@ CREATE TABLE users (
     email TEXT UNIQUE NOT NULL,
     password TEXT NOT NULL,
     role TEXT DEFAULT 'customer',
-    created_at TIMESTAMP DEFAULT now()
+    created_at TIMESTAMP DEFAULT now(),
+    updated_at TIMESTAMP DEFAULT now(),
+    created_by UUID,
+    updated_by UUID,
+    is_active BOOLEAN DEFAULT false,
+    is_deleted BOOLEAN DEFAULT false
 );
 
 -- CATEGORIES
@@ -156,9 +167,9 @@ CREATE TABLE orders (
 
 -- SEED DATA
 
--- Admin user
+-- Admin user (password is hashed version of '123456')
 INSERT INTO users (email, password, role)
-VALUES ('admin@shop.com', '123456', 'admin');
+VALUES ('admin@shop.com', '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'admin');
 
 -- Categories (5 records)
 INSERT INTO categories (name, description) VALUES
@@ -272,7 +283,22 @@ func LoadConfig() Config {
 		jwtSecret = "default-secret-key" // For development, change in production
 	}
 
+	smtpHost := os.Getenv("SMTP_HOST")
+	smtpPort := os.Getenv("SMTP_PORT")
+	smtpUsername := os.Getenv("SMTP_USERNAME")
+	smtpPassword := os.Getenv("SMTP_PASSWORD")
+	emailFrom := os.Getenv("EMAIL_FROM")
+	appBaseURLLocal := os.Getenv("APP_BASE_URL_LOCAL")
+	appBaseURLDeploy := os.Getenv("APP_BASE_URL_DEPLOY")
+
 	return Config{
-		JWTSecret: jwtSecret,
+		JWTSecret:        jwtSecret,
+		SMTPHost:         smtpHost,
+		SMTPPort:         smtpPort,
+		SMTPUsername:     smtpUsername,
+		SMTPPassword:     smtpPassword,
+		EmailFrom:        emailFrom,
+		AppBaseURLLocal:  appBaseURLLocal,
+		AppBaseURLDeploy: appBaseURLDeploy,
 	}
 }
