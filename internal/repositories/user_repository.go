@@ -90,6 +90,27 @@ func (r *UserRepository) CheckPassword(hashedPassword, password string) bool {
 	return err == nil
 }
 
+func (r *UserRepository) GetUserByID(ctx context.Context, userID string) (*models.User, error) {
+	query := `
+		SELECT id, email, password, role, created_at, updated_at, created_by, updated_by, is_active, is_deleted
+		FROM users
+		WHERE id = $1
+	`
+
+	var user models.User
+	err := r.DB.QueryRow(ctx, query, userID).Scan(
+		&user.ID, &user.Email, &user.Password, &user.Role, &user.CreatedAt, &user.UpdatedAt, &user.CreatedBy, &user.UpdatedBy, &user.IsActive, &user.IsDeleted,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, errors.New("user not found")
+		}
+		return nil, err
+	}
+
+	return &user, nil
+}
+
 func (r *UserRepository) ActivateUser(ctx context.Context, userID string) error {
 	query := `
 		UPDATE users
@@ -127,4 +148,48 @@ func (r *UserRepository) GetAllUsers(ctx context.Context) ([]*models.User, error
 	}
 
 	return users, nil
+}
+
+func (r *UserRepository) UpdateUserEmail(ctx context.Context, userID, newEmail string) error {
+	query := `
+		UPDATE users
+		SET email = $1, updated_at = now()
+		WHERE id = $2
+	`
+
+	_, err := r.DB.Exec(ctx, query, newEmail, userID)
+	return err
+}
+
+func (r *UserRepository) UpdateUserRole(ctx context.Context, userID, newRole string) error {
+	query := `
+		UPDATE users
+		SET role = $1, updated_at = now()
+		WHERE id = $2
+	`
+
+	_, err := r.DB.Exec(ctx, query, newRole, userID)
+	return err
+}
+
+func (r *UserRepository) ToggleUserActive(ctx context.Context, userID string) error {
+	query := `
+		UPDATE users
+		SET is_active = NOT is_active, updated_at = now()
+		WHERE id = $1
+	`
+
+	_, err := r.DB.Exec(ctx, query, userID)
+	return err
+}
+
+func (r *UserRepository) SoftDeleteUser(ctx context.Context, userID string) error {
+	query := `
+		UPDATE users
+		SET is_deleted = true, updated_at = now()
+		WHERE id = $1
+	`
+
+	_, err := r.DB.Exec(ctx, query, userID)
+	return err
 }

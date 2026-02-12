@@ -98,14 +98,26 @@ CREATE TABLE users (
 CREATE TABLE categories (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name TEXT NOT NULL,
-    description TEXT
+    description TEXT,
+    created_at TIMESTAMP DEFAULT now(),
+    updated_at TIMESTAMP DEFAULT now(),
+    created_by UUID,
+    updated_by UUID,
+    is_active BOOLEAN DEFAULT true,
+    is_deleted BOOLEAN DEFAULT false
 );
 
 -- BRANDS
 CREATE TABLE brands (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name TEXT NOT NULL,
-    description TEXT
+    description TEXT,
+    created_at TIMESTAMP DEFAULT now(),
+    updated_at TIMESTAMP DEFAULT now(),
+    created_by UUID,
+    updated_by UUID,
+    is_active BOOLEAN DEFAULT true,
+    is_deleted BOOLEAN DEFAULT false
 );
 
 -- PRODUCTS

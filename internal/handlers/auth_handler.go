@@ -41,6 +41,15 @@ type CreateUserRequest struct {
 	Role     string `json:"role"`
 }
 
+type UpdateEmailRequest struct {
+	NewEmail string `json:"new_email" binding:"required,email"`
+}
+
+type UpdateRoleRequest struct {
+	UserID  string `json:"user_id" binding:"required"`
+	NewRole string `json:"new_role" binding:"required"`
+}
+
 func NewAuthHandler(userRepo *repositories.UserRepository, emailService *services.EmailService, jwtSecret string, cfg config.Config) *AuthHandler {
 	return &AuthHandler{
 		userRepo:     userRepo,
@@ -289,4 +298,281 @@ func (h *AuthHandler) GetAllUsers(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, users)
+}
+
+// UpdateEmail godoc
+// @Summary Update user email
+// @Description Request to update user email, sends confirmation email to new email
+// @Tags auth
+// @Accept  json
+// @Produce  json
+// @Security BearerAuth
+// @Param request body UpdateEmailRequest true "New email data"
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /auth/update-email [put]
+func (h *AuthHandler) UpdateEmail(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	var req UpdateEmailRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Generate email update confirmation token
+	confirmationToken, err := h.generateEmailUpdateToken(userID.(string), req.NewEmail)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate confirmation token"})
+		return
+	}
+
+	// Determine base URL
+	baseURL := h.cfg.AppBaseURLLocal
+	if baseURL == "" {
+		baseURL = "http://localhost:8080" // fallback
+	}
+
+	// Send confirmation email to new email address
+	err = h.emailService.SendEmailUpdateConfirmation(req.NewEmail, confirmationToken, baseURL)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send confirmation email"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Email update requested. Please check your new email address to confirm the change."})
+}
+
+// ConfirmEmailUpdate godoc
+// @Summary Confirm email update
+// @Description Confirm email update using token from confirmation email
+// @Tags auth
+// @Accept  json
+// @Produce  json
+// @Param token query string true "Confirmation token"
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /auth/confirm-email-update [get]
+func (h *AuthHandler) ConfirmEmailUpdate(c *gin.Context) {
+	tokenString := c.Query("token")
+	if tokenString == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Token is required"})
+		return
+	}
+
+	claims := &jwt.MapClaims{}
+	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
+		return []byte(h.jwtSecret), nil
+	})
+
+	if err != nil || !token.Valid {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired token"})
+		return
+	}
+
+	if (*claims)["type"] != "email_update" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token type"})
+		return
+	}
+
+	userID := (*claims)["user_id"].(string)
+	newEmail := (*claims)["new_email"].(string)
+
+	err = h.userRepo.UpdateUserEmail(c.Request.Context(), userID, newEmail)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update email"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Email updated successfully."})
+}
+
+func (h *AuthHandler) generateEmailUpdateToken(userID, newEmail string) (string, error) {
+	claims := jwt.MapClaims{
+		"user_id":   userID,
+		"new_email": newEmail,
+		"type":      "email_update",
+		"exp":       time.Now().Add(time.Hour * 24).Unix(), // 24 hours for confirmation
+		"iat":       time.Now().Unix(),
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString([]byte(h.jwtSecret))
+}
+
+// ToggleUserActive godoc
+// @Summary Toggle user active status (Admin only)
+// @Description Toggle user active/inactive status. Admin cannot toggle their own status or other admins' status
+// @Tags admin
+// @Accept  json
+// @Produce  json
+// @Security BearerAuth
+// @Param request body UpdateRoleRequest true "User ID to toggle"
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Failure 403 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /admin/users/toggle-active [patch]
+func (h *AuthHandler) ToggleUserActive(c *gin.Context) {
+	adminID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	var req UpdateRoleRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Check if admin is trying to toggle their own status
+	if adminID.(string) == req.UserID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Admin cannot toggle their own active status"})
+		return
+	}
+
+	// Check if target user is an admin (admins cannot toggle other admins)
+	targetUser, err := h.userRepo.GetUserByID(c.Request.Context(), req.UserID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	if targetUser.Role == "Admin" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Cannot toggle another admin's active status"})
+		return
+	}
+
+	err = h.userRepo.ToggleUserActive(c.Request.Context(), req.UserID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to toggle user active status"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "User active status toggled successfully"})
+}
+
+// SoftDeleteUser godoc
+// @Summary Soft delete user (Admin only)
+// @Description Soft delete user by setting is_deleted flag. Admin cannot delete themselves or other admins
+// @Tags admin
+// @Accept  json
+// @Produce  json
+// @Security BearerAuth
+// @Param request body UpdateRoleRequest true "User ID to soft delete"
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Failure 403 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /admin/users/soft-delete [delete]
+func (h *AuthHandler) SoftDeleteUser(c *gin.Context) {
+	adminID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	var req UpdateRoleRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Check if admin is trying to delete themselves
+	if adminID.(string) == req.UserID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Admin cannot delete themselves"})
+		return
+	}
+
+	// Check if target user is an admin (admins cannot delete other admins)
+	targetUser, err := h.userRepo.GetUserByID(c.Request.Context(), req.UserID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	if targetUser.Role == "Admin" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Cannot delete another admin"})
+		return
+	}
+
+	err = h.userRepo.SoftDeleteUser(c.Request.Context(), req.UserID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to soft delete user"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "User soft deleted successfully"})
+}
+
+// UpdateUserRole godoc
+// @Summary Update user role (Admin only)
+// @Description Update user role. Admin cannot update their own role or other admins' roles
+// @Tags admin
+// @Accept  json
+// @Produce  json
+// @Security BearerAuth
+// @Param request body UpdateRoleRequest true "Role update data"
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Failure 403 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /admin/users/role [put]
+func (h *AuthHandler) UpdateUserRole(c *gin.Context) {
+	adminID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	var req UpdateRoleRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Check if admin is trying to update their own role
+	if adminID.(string) == req.UserID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Admin cannot update their own role"})
+		return
+	}
+
+	// Check if target user is an admin (admins cannot update other admins)
+	targetUser, err := h.userRepo.GetUserByID(c.Request.Context(), req.UserID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	if targetUser.Role == "Admin" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Cannot update another admin's role"})
+		return
+	}
+
+	// Validate role
+	validRoles := map[string]bool{"Admin": true, "Customer": true, "Staff": true}
+	if !validRoles[req.NewRole] {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid role. Must be Admin, Customer, or Staff"})
+		return
+	}
+
+	err = h.userRepo.UpdateUserRole(c.Request.Context(), req.UserID, req.NewRole)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user role"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "User role updated successfully"})
 }

@@ -7,6 +7,24 @@ definitions:
       user:
         $ref: '#/definitions/models.User'
     type: object
+  handlers.CreateBrandRequest:
+    properties:
+      description:
+        type: string
+      name:
+        type: string
+    required:
+    - name
+    type: object
+  handlers.CreateCategoryRequest:
+    properties:
+      description:
+        type: string
+      name:
+        type: string
+    required:
+    - name
+    type: object
   handlers.CreateProductRequest:
     properties:
       brand_name:
@@ -63,6 +81,31 @@ definitions:
     - email
     - password
     type: object
+  handlers.UpdateBrandRequest:
+    properties:
+      description:
+        type: string
+      name:
+        type: string
+    required:
+    - name
+    type: object
+  handlers.UpdateCategoryRequest:
+    properties:
+      description:
+        type: string
+      name:
+        type: string
+    required:
+    - name
+    type: object
+  handlers.UpdateEmailRequest:
+    properties:
+      new_email:
+        type: string
+    required:
+    - new_email
+    type: object
   handlers.UpdateProductRequest:
     properties:
       brand_name:
@@ -82,6 +125,16 @@ definitions:
     - category_name
     - name
     - variants
+    type: object
+  handlers.UpdateRoleRequest:
+    properties:
+      new_role:
+        type: string
+      user_id:
+        type: string
+    required:
+    - new_role
+    - user_id
     type: object
   handlers.VariantRequest:
     properties:
@@ -108,6 +161,8 @@ definitions:
       created_at:
         type: string
       created_by:
+        type: string
+      description:
         type: string
       id:
         type: string
@@ -321,6 +376,200 @@ paths:
       summary: Create a new user account (Admin only)
       tags:
       - admin
+  /admin/users/role:
+    put:
+      consumes:
+      - application/json
+      description: Update user role. Admin cannot update their own role or other admins'
+        roles
+      parameters:
+      - description: Role update data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.UpdateRoleRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update user role (Admin only)
+      tags:
+      - admin
+  /admin/users/soft-delete:
+    delete:
+      consumes:
+      - application/json
+      description: Soft delete user by setting is_deleted flag. Admin cannot delete
+        themselves or other admins
+      parameters:
+      - description: User ID to soft delete
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.UpdateRoleRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Soft delete user (Admin only)
+      tags:
+      - admin
+  /admin/users/toggle-active:
+    patch:
+      consumes:
+      - application/json
+      description: Toggle user active/inactive status. Admin cannot toggle their own
+        status or other admins' status
+      parameters:
+      - description: User ID to toggle
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.UpdateRoleRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Toggle user active status (Admin only)
+      tags:
+      - admin
+  /auth/confirm-email-update:
+    get:
+      consumes:
+      - application/json
+      description: Confirm email update using token from confirmation email
+      parameters:
+      - description: Confirmation token
+        in: query
+        name: token
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Confirm email update
+      tags:
+      - auth
   /auth/login:
     post:
       consumes:
@@ -397,6 +646,50 @@ paths:
       summary: Register a new user
       tags:
       - auth
+  /auth/update-email:
+    put:
+      consumes:
+      - application/json
+      description: Request to update user email, sends confirmation email to new email
+      parameters:
+      - description: New email data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.UpdateEmailRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update user email
+      tags:
+      - auth
   /auth/verify-email:
     get:
       consumes:
@@ -455,6 +748,136 @@ paths:
       summary: Get all brands
       tags:
       - brands
+    post:
+      consumes:
+      - application/json
+      description: Create a new brand with the provided details
+      parameters:
+      - description: Brand creation data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.CreateBrandRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.Brand'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Create a new brand
+      tags:
+      - brands
+  /brands/{id}:
+    put:
+      consumes:
+      - application/json
+      description: Update a brand with the provided details
+      parameters:
+      - description: Brand ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Brand update data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.UpdateBrandRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Brand'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Update an existing brand
+      tags:
+      - brands
+  /brands/{id}/soft-delete:
+    delete:
+      consumes:
+      - application/json
+      description: Mark a brand as deleted (soft delete)
+      parameters:
+      - description: Brand ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Soft delete a brand
+      tags:
+      - brands
+  /brands/{id}/toggle-active:
+    patch:
+      consumes:
+      - application/json
+      description: Toggle the active status of a brand (activate/deactivate)
+      parameters:
+      - description: Brand ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Toggle brand active status
+      tags:
+      - brands
   /categories:
     get:
       consumes:
@@ -470,6 +893,136 @@ paths:
               $ref: '#/definitions/models.Category'
             type: array
       summary: Get all categories
+      tags:
+      - categories
+    post:
+      consumes:
+      - application/json
+      description: Create a new category with the provided details
+      parameters:
+      - description: Category creation data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.CreateCategoryRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.Category'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Create a new category
+      tags:
+      - categories
+  /categories/{id}:
+    put:
+      consumes:
+      - application/json
+      description: Update a category with the provided details
+      parameters:
+      - description: Category ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Category update data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.UpdateCategoryRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Category'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Update an existing category
+      tags:
+      - categories
+  /categories/{id}/soft-delete:
+    delete:
+      consumes:
+      - application/json
+      description: Mark a category as deleted (soft delete)
+      parameters:
+      - description: Category ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Soft delete a category
+      tags:
+      - categories
+  /categories/{id}/toggle-active:
+    patch:
+      consumes:
+      - application/json
+      description: Toggle the active status of a category (activate/deactivate)
+      parameters:
+      - description: Category ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Toggle category active status
       tags:
       - categories
   /product-variants/{id}/soft-delete:

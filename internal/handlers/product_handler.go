@@ -270,42 +270,6 @@ func (h *ProductHandler) UpdateProduct(c *gin.Context) {
 	c.JSON(http.StatusOK, product)
 }
 
-// GetAllCategories godoc
-// @Summary Get all categories
-// @Description Retrieve a list of all categories
-// @Tags categories
-// @Accept  json
-// @Produce  json
-// @Success 200 {array} models.Category
-// @Router /categories [get]
-func (h *ProductHandler) GetAllCategories(c *gin.Context) {
-	categories, err := h.repo.GetAllCategories(c.Request.Context())
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, categories)
-}
-
-// GetAllBrands godoc
-// @Summary Get all brands
-// @Description Retrieve a list of all brands
-// @Tags brands
-// @Accept  json
-// @Produce  json
-// @Success 200 {array} models.Brand
-// @Router /brands [get]
-func (h *ProductHandler) GetAllBrands(c *gin.Context) {
-	brands, err := h.repo.GetAllBrands(c.Request.Context())
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, brands)
-}
-
 // ToggleActive godoc
 // @Summary Toggle product active status
 // @Description Toggle the active status of a product (activate/deactivate)

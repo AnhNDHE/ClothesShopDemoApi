@@ -60,6 +60,28 @@ Clothes Shop Team
 	return e.sendEmail(toEmail, subject, body)
 }
 
+func (e *EmailService) SendEmailUpdateConfirmation(toEmail, token, baseURL string) error {
+	subject := "Confirm Your Email Update - Clothes Shop"
+	confirmationLink := fmt.Sprintf("%s/auth/confirm-email-update?token=%s", baseURL, token)
+
+	body := fmt.Sprintf(`
+Hello,
+
+You have requested to update your email address for your Clothes Shop account.
+
+Please click the link below to confirm this email update:
+
+%s
+
+If you did not request this change, please ignore this email.
+
+Best regards,
+Clothes Shop Team
+`, confirmationLink)
+
+	return e.sendEmail(toEmail, subject, body)
+}
+
 func (e *EmailService) sendEmail(to, subject, body string) error {
 	if e.cfg.SMTPHost == "" || e.cfg.SMTPPort == "" {
 		return fmt.Errorf("SMTP configuration is missing")
