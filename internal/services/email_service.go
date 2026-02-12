@@ -37,6 +37,29 @@ Clothes Shop Team
 	return e.sendEmail(toEmail, subject, body)
 }
 
+func (e *EmailService) SendAccountCreatedEmail(toEmail, password string) error {
+	subject := "Your Account Has Been Created - Clothes Shop"
+
+	body := fmt.Sprintf(`
+Hello,
+
+Your account has been successfully created for Clothes Shop!
+
+Account Details:
+- Email: %s
+- Password: %s
+
+Please keep this information secure. You can now log in to your account.
+
+If you have any questions, please contact our support team.
+
+Best regards,
+Clothes Shop Team
+`, toEmail, password)
+
+	return e.sendEmail(toEmail, subject, body)
+}
+
 func (e *EmailService) sendEmail(to, subject, body string) error {
 	if e.cfg.SMTPHost == "" || e.cfg.SMTPPort == "" {
 		return fmt.Errorf("SMTP configuration is missing")

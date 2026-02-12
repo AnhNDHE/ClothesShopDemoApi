@@ -20,6 +20,10 @@ import (
 // @version 1.0
 // @description A RESTful API for a clothes shop built with Golang and Gin.
 // @BasePath /
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+// @description Enter JWT token without "Bearer" prefix.
 func main() {
 
 	// Load .env (local only)

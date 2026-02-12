@@ -9,6 +9,14 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+func JWTAuthMiddleware(jwtSecret string) gin.HandlerFunc {
+	return handlers.JWTAuthMiddleware(jwtSecret)
+}
+
+func AdminOnlyMiddleware() gin.HandlerFunc {
+	return handlers.AdminOnlyMiddleware()
+}
+
 func SetupRoutes(r *gin.Engine, jwtSecret string) {
 	cfg := config.LoadConfig()
 
@@ -27,6 +35,14 @@ func SetupRoutes(r *gin.Engine, jwtSecret string) {
 	r.POST("/auth/register", authHandler.Register)
 	r.POST("/auth/login", authHandler.Login)
 	r.GET("/auth/verify-email", authHandler.VerifyEmail)
+
+	// Admin routes
+	admin := r.Group("/admin")
+	admin.Use(JWTAuthMiddleware(jwtSecret), AdminOnlyMiddleware())
+	{
+		admin.POST("/users", authHandler.CreateUser)
+		admin.GET("/users", authHandler.GetAllUsers)
+	}
 
 	// Product routes
 	r.GET("/products", productHandler.GetAllProducts)

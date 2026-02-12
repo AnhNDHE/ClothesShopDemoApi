@@ -35,6 +35,12 @@ type AuthResponse struct {
 	User  models.User `json:"user"`
 }
 
+type CreateUserRequest struct {
+	Email    string `json:"email" binding:"required,email"`
+	Password string `json:"password" binding:"required,min=6"`
+	Role     string `json:"role"`
+}
+
 func NewAuthHandler(userRepo *repositories.UserRepository, emailService *services.EmailService, jwtSecret string, cfg config.Config) *AuthHandler {
 	return &AuthHandler{
 		userRepo:     userRepo,
@@ -211,4 +217,76 @@ func (h *AuthHandler) VerifyEmail(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Email verified successfully. You can now log in."})
+}
+
+// CreateUser godoc
+// @Summary Create a new user account (Admin only)
+// @Description Create a new user account with active status and send email with credentials
+// @Tags admin
+// @Accept  json
+// @Produce  json
+// @Security BearerAuth
+// @Param request body CreateUserRequest true "User creation data"
+// @Success 201 {object} AuthResponse
+// @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Failure 403 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /admin/users [post]
+func (h *AuthHandler) CreateUser(c *gin.Context) {
+	var req CreateUserRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if req.Role == "" {
+		req.Role = "customer"
+	}
+
+	user, err := h.userRepo.CreateUserActive(c.Request.Context(), req.Email, req.Password, req.Role)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user"})
+		return
+	}
+
+	// Send email with account credentials
+	err = h.emailService.SendAccountCreatedEmail(user.Email, req.Password)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send account creation email"})
+		return
+	}
+
+	token, err := h.generateToken(user.ID.String(), user.Email, user.Role)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
+		return
+	}
+
+	c.JSON(http.StatusCreated, AuthResponse{
+		Token: token,
+		User:  *user,
+	})
+}
+
+// GetAllUsers godoc
+// @Summary Get all users (Admin only)
+// @Description Retrieve a list of all users (requires admin role)
+// @Tags admin
+// @Accept  json
+// @Produce  json
+// @Security BearerAuth
+// @Success 200 {array} models.User
+// @Failure 401 {object} map[string]string
+// @Failure 403 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /admin/users [get]
+func (h *AuthHandler) GetAllUsers(c *gin.Context) {
+	users, err := h.userRepo.GetAllUsers(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve users"})
+		return
+	}
+
+	c.JSON(http.StatusOK, users)
 }
